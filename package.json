@@ -1,0 +1,44 @@
+{
+	"name": "cisco-roomos",
+	"version": "2.1.0",
+	"main": "dist/index.js",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/SveinTerje/companion-roomos-module.git"
+	},
+	"license": "MIT",
+	"scripts": {
+		"prepare": "husky install",
+		"dev": "yarn build:watch",
+		"build": "rimraf dist && yarn build:main",
+		"build:main": "tsc",
+		"build:watch": "tsc --watch",
+		"lint:raw": "eslint --ext .ts --ext .js --ignore-pattern dist --ignore-pattern pkg",
+		"lint": "yarn lint:raw .",
+		"test:unit": "node dist/xapi-path.selftest.js",
+		"postinstall": "rimraf node_modules/ssh2/lib/protocol/crypto/build node_modules/cpu-features"
+	},
+	"lint-staged": {
+		"*.{js,json,md}": [
+			"prettier --write"
+		],
+		"*.{ts}": [
+			"yarn lint:raw --fix --"
+		]
+	},
+	"prettier": "@companion-module/tools/.prettierrc.json",
+	"dependencies": {
+		"@companion-module/base": "~1.4.1",
+		"jsxapi": "^5.1.1",
+		"ws": "^8.21.0"
+	},
+	"devDependencies": {
+		"@companion-module/tools": "^2.8.0",
+		"@types/node": "^18.16.18",
+		"@types/ws": "^8.5.5",
+		"husky": "^8.0.3",
+		"lint-staged": "^13.2.2",
+		"rimraf": "^5.0.1",
+		"typescript": "~5.0"
+	}
+}
