@@ -714,7 +714,7 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 				min: -300,
 				max: 300,
 				default: 0,
-				id: 'Pan',
+				id: 'Roll',
 			},
 			{
 				label: 'Tilt',
@@ -722,7 +722,7 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 				min: -9000,
 				max: 9000,
 				default: 0,
-				id: 'Pan',
+				id: 'Tilt',
 			},
 			{
 				label: 'Zoom',
