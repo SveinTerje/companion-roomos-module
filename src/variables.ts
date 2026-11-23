@@ -33,7 +33,6 @@ export function InitVariables(instance: RoomOSInstanceBase): void {
 		event_last_count: '0',
 		SystemUnit_Software_Version: '',
 		number_of_active_calls: '',
-		selected_device: '',
 		microphones_mute: '',
 		audio_connector_mute: '',
 		systemtime: '',

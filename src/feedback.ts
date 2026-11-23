@@ -76,8 +76,6 @@ export function HandleXAPIFeedback(instance: RoomOSInstanceBase, event: any): vo
 	const checkFeedbacks: FeedbackId[] = []
 
 	if (event.Audio) {
-		if (event.Audio.SelectedDevice != null) newValues['selected_device'] = event.Audio.SelectedDevice
-
 		if (
 			event.Audio.Input != undefined &&
 			event.Audio.Input.Connectors != undefined &&

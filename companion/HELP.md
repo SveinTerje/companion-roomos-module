@@ -38,7 +38,6 @@ These variables appear in Companion’s variable picker so you can put them on a
 | --- | --- |
 | `SystemUnit Software Version` | `SystemUnit_Software_Version` |
 | `SystemUnit State NumberOfActiveCalls` | `number_of_active_calls` |
-| `Audio SelectedDevice` | `selected_device` |
 | `Audio Microphones Mute` | `microphones_mute` |
 | `Audio Input Connectors Microphone` | `audio_connector_mute` |
 | `Time SystemTime` | `systemtime` |

@@ -23,11 +23,6 @@ export const STANDARD_STATUS_SUBSCRIPTIONS: StandardStatus[] = [
 		name: 'SystemUnit Number of active calls',
 	},
 	{
-		path: 'Audio/SelectedDevice',
-		variableId: 'selected_device',
-		name: 'Audio Selected device',
-	},
-	{
 		path: 'Audio/Microphones/Mute',
 		variableId: 'microphones_mute',
 		name: 'Audio Microphones Mute',
