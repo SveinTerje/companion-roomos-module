@@ -14,7 +14,7 @@ You need:
 
 - [Companion](https://bitfocus.io/companion) 4.x
 - [Git](https://git-scm.com/downloads)
-- [Node.js](https://nodejs.org/) 18 (Node 22 works; add `--ignore-engines` to `yarn install` if Yarn complains)
+- [Node.js](https://nodejs.org/) 22 (Yarn may still warn about engines from older dependencies; add `--ignore-engines` if install fails)
 - [Yarn 1](https://classic.yarnpkg.com/en/docs/install) (`npm install -g yarn`)
 
 ### 1. Create a developer folder and clone this repo
