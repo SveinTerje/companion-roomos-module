@@ -46,7 +46,8 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			label: 'Connection protocol',
 			width: 6,
 			choices: [
-				{ id: 'wss', label: 'Websocket' },
+				{ id: 'wss', label: 'Websocket (HTTPS)' },
+				{ id: 'ws', label: 'Websocket (HTTP)' },
 				{ id: 'ssh', label: 'ssh' },
 			],
 			default: 'wss',

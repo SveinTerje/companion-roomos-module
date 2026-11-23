@@ -10,6 +10,7 @@ import {
 	stringifyXapiValue,
 	subscriptionKey,
 } from './xapi-path.js'
+import { formatXapiError } from './xapi-rpc.js'
 
 /** Cisco allows at most 50 xFeedback expressions per session. */
 export const MAX_XFEEDBACK_EXPRESSIONS = 50
@@ -171,45 +172,43 @@ export class SubscriptionManager {
 	}
 
 	private applyBuiltins(xapi: XAPI): void {
-		this.builtinOff.push(
+		this.trackBuiltin(
 			xapi.status.on('Audio', (event: unknown) => {
 				HandleXAPIFeedback(this.instance, { Audio: event })
 			}) as OffFn
 		)
-		this.builtinOff.push(
+		this.trackBuiltin(
 			xapi.status.on('Call', (event: unknown) => {
 				HandleXAPIFeedback(this.instance, { Call: this.normalizeCallPayload(event) })
 			}) as OffFn
 		)
-		this.builtinOff.push(
+		this.trackBuiltin(
 			xapi.status.on('Conference', (event: unknown) => {
 				HandleXAPIFeedback(this.instance, { Conference: event })
 			}) as OffFn
 		)
-		this.builtinOff.push(
+		this.trackBuiltin(
 			xapi.status.on('Time', (event: unknown) => {
 				HandleXAPIFeedback(this.instance, { Time: event })
 			}) as OffFn
 		)
-		this.builtinOff.push(
+		this.trackBuiltin(
 			xapi.status.on('SystemUnit/State/NumberOfActiveCalls', (value: unknown) => {
 				this.instance.setVariableValues({ number_of_active_calls: stringifyXapiValue(value) })
 			}) as OffFn
 		)
-		this.builtinOff.push(
+		this.trackBuiltin(
 			xapi.config.on('Conference/AutoAnswer', (event: unknown) => {
 				HandleXAPIConfFeedback(this.instance, { Conference: { AutoAnswer: event } })
 			}) as OffFn
 		)
+	}
 
-		xapi.status
-			.get('SystemUnit/State/NumberOfActiveCalls')
-			.then((value: unknown) => {
-				this.instance.setVariableValues({ number_of_active_calls: stringifyXapiValue(value) })
-			})
-			.catch((e: unknown) => {
-				this.instance.log('error', `Failed to check NumberOfActiveCalls: ${e}`)
-			})
+	private trackBuiltin(off: OffFn): void {
+		this.builtinOff.push(off)
+		off.registration?.catch((e: unknown) => {
+			this.instance.log('warn', `xFeedback subscribe failed: ${formatXapiError(e)}`)
+		})
 	}
 
 	private activateCustom(xapi: XAPI, sub: CustomSubscription): void {
@@ -221,14 +220,9 @@ export class SubscriptionManager {
 				this.instance.setVariableValues({ [sub.variableId]: stringifyXapiValue(value) })
 			}) as OffFn
 			this.customOff.set(key, off)
-			xapi.status
-				.get(sub.path)
-				.then((value: unknown) => {
-					this.instance.setVariableValues({ [sub.variableId]: stringifyXapiValue(value) })
-				})
-				.catch((e: unknown) => {
-					this.instance.log('warn', `xStatus get ${sub.path} failed: ${e}`)
-				})
+			off.registration?.catch((e: unknown) => {
+				this.instance.log('warn', `xStatus subscribe ${sub.path} failed: ${formatXapiError(e)}`)
+			})
 			return
 		}
 
@@ -249,6 +243,9 @@ export class SubscriptionManager {
 			this.instance.setVariableValues(values)
 		}) as OffFn
 		this.customOff.set(key, off)
+		off.registration?.catch((e: unknown) => {
+			this.instance.log('warn', `xEvent subscribe ${sub.path} failed: ${formatXapiError(e)}`)
+		})
 	}
 
 	private deactivateCustom(key: string): void {

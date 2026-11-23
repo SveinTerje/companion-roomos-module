@@ -9,6 +9,10 @@ WebSocket is the default. On the device you need:
 - `xConfiguration NetworkServices HTTP Mode: HTTP+HTTPS` or `HTTPS`
 - `xConfiguration NetworkServices Websocket: FollowHTTPService`
 
+Use **Websocket (HTTPS)** when HTTP Mode is `HTTPS` or `HTTP+HTTPS`. If Companion logs `Unexpected server response: 502` on connect, the codec's TLS WebSocket path is refusing the upgrade — switch the connection protocol to **Websocket (HTTP)** (requires HTTP Mode `HTTP+HTTPS`) or **ssh**.
+
+Initial xStatus/xConfiguration values are pushed with each subscription (`NotifyCurrentValue`). This module does not `xGet` whole trees such as `Status Audio` on connect, which some codecs reject while live xFeedback still works.
+
 Subscriptions are per connection. After a reconnect this module re-subscribes automatically. After a Companion restart, run the subscribe actions again (for example from a page you press once, or from a trigger).
 
 Cisco allows **at most 50** `xFeedback` expressions on one session. This module never registers `/Status` as a whole.

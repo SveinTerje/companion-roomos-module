@@ -1,19 +1,24 @@
-import { RoomOSInstanceBase, RoomOSOnOffBoolean, RoomOSConfigAutoAnswer } from './roomos.js'
+import { RoomOSInstanceBase, RoomOSOnOffBoolean } from './roomos.js'
 import { connect as XAPIConnect } from 'jsxapi'
 import { GetActionsList } from './actions.js'
 import { DeviceConfig, GetConfigFields } from './config.js'
-import { FeedbackId, GetFeedbacksList } from './feedback.js'
+import { GetFeedbacksList } from './feedback.js'
 import { GetPresetsList } from './presets.js'
 import { InitVariables } from './variables.js'
 import { SubscriptionManager } from './subscriptions.js'
-import { CompanionVariableValues, InstanceStatus, SomeCompanionConfigField } from '@companion-module/base'
+import { formatXapiError, installJsxapiPatches, isTransportFailure } from './xapi-rpc.js'
+import { InstanceStatus, SomeCompanionConfigField } from '@companion-module/base'
 
 export { UpgradeScripts } from './upgrades.js'
+
+const TRANSPORT_ERROR_LOG_INTERVAL_MS = 30_000
 
 export default class ControllerInstance extends RoomOSInstanceBase {
 	private connected: boolean
 	private connecting: boolean
 	private timer?: NodeJS.Timeout
+	private connectionEpoch = 0
+	private lastTransportErrorLogAt = 0
 
 	private config!: DeviceConfig
 
@@ -47,121 +52,86 @@ export default class ControllerInstance extends RoomOSInstanceBase {
 	 * Setup connection for SSH connection
 	 */
 	public initSSH(): void {
-		if (this.xapi !== undefined) {
-			this.subscriptions.detach()
-			this.xapi.close()
-			this.xapi = undefined
-			this.reset()
-			InitVariables(this)
+		this.dropConnection()
+		InitVariables(this)
+
+		if (!this.config.host) {
+			return
 		}
+
+		const epoch = this.connectionEpoch
 
 		try {
 			const { host, username, password, protocol } = this.config
 			this.xapi = XAPIConnect(`${protocol}://` + host, {
 				username,
 				password,
+				loglevel: 'error',
 			})
+			installJsxapiPatches(this.xapi.constructor as { prototype: { execute: (method: string, params?: unknown) => Promise<unknown> } })
 
 			this.connecting = true
 			this.updateStatus(InstanceStatus.Connecting)
 
 			this.xapi.on('error', (error) => {
-				this.updateStatus(InstanceStatus.ConnectionFailure)
-				this.log('error', 'Cisco RoomOS error: ' + error)
-				this.subscriptions.detach()
-				this.xapi = undefined
-				this.connected = false
-				this.connecting = false
-				this.reset()
+				if (epoch !== this.connectionEpoch) return
+				const message = formatXapiError(error)
+				if (!isTransportFailure(error)) {
+					this.log('debug', `Cisco RoomOS RPC error (connection kept): ${message}`)
+					return
+				}
+				this.logTransportFailure(message)
+				this.dropConnection()
+				this.updateStatus(InstanceStatus.ConnectionFailure, message)
 			})
 
 			this.xapi.on('ready', () => {
-				// console.log('ready THIS:', this)
+				if (epoch !== this.connectionEpoch) return
 				this.updateStatus(InstanceStatus.Ok)
 				this.connected = true
+				this.connecting = false
 				if (this.xapi) this.subscriptions.attach(this.xapi)
 				this.checkAllFeedbacks()
-
-				this.xapi?.config
-					.get('Conference AutoAnswer')
-					.then((value) => {
-						if (value?.Mode) {
-							const newValues: CompanionVariableValues = {}
-							if (value?.Mode != null) newValues['autoanswer_mode'] = value.Mode
-							if (value?.Mute != null) newValues['autoanswer_mute'] = value.Mute
-							if (value?.Delay != null) newValues['autoanswer_delay'] = value.Delay
-							this.setVariableValues(newValues)
-							this.autoAnswerConfig = value as RoomOSConfigAutoAnswer
-						}
-					})
-					.catch((e) => {
-						this.log('error', `Failed to check Conference AutoAnswer: ${e}`)
-					})
-				this.xapi?.Status.Conference.get()
-					.then((value: any) => {
-						const newValues: CompanionVariableValues = {}
-
-						if (value.DoNotDisturb != null) {
-							newValues['DoNotDisturb'] = value.DoNotDisturb
-						}
-						if (value.Presentation != null) {
-							newValues['Presentation'] = value.Presentation.CallId + value.Presentation.Mode
-						}
-						if (value.SelectedCallProtocol != null) {
-							newValues['SelectedCallProtocol'] = value.SelectedCallProtocol
-						}
-
-						this.setVariableValues(newValues)
-					})
-					.catch((e: any) => {
-						this.log('error', `Failed to check Conference: ${e}`)
-					})
-
-				this.xapi?.Status.Time.SystemTime.get()
-					.then((time: Date) => {
-						this.setVariableValues({ systemtime: time.toString() })
-					})
-					.catch((e: any) => {
-						this.log('error', `Failed to check Time SystemTime: ${e}`)
-					})
-				this.xapi?.Status.Audio.SelectedDevice.get()
-					.then((value: any) => {
-						console.log('AUDIO SELECTED DEVICE:', value)
-						this.setVariableValues({ selected_device: value.SelectedDevice })
-					})
-					.catch((e: any) => {
-						this.log('error', `Failed to check Audio SelectedDevice: ${e}`)
-					})
-				this.xapi?.Status.Audio.get()
-					.then((value: any) => {
-						let muteState = ''
-						for (let index = 0; index < value.Input.Connectors.Microphone.length; index++) {
-							const element = value.Input.Connectors.Microphone[index]
-							muteState += `(Mic ${element.id} Mute: ${element.Mute})`
-							this.connectorMute[element.id] = element.Mute
-						}
-						this.setVariableValues({
-							audio_connector_mute: muteState,
-							volume: value.Volume,
-							microphones_musicmode: value.Microphones.MusicMode,
-							microphones_mute: value.Microphones.Mute,
-						})
-						this.microphoneMute = value.Microphones.Mute == 'On' ? true : false
-						this.checkFeedbacks(FeedbackId.MicrophoneMute)
-					})
-					.catch((e: any) => {
-						this.log('error', `Failed to check Audio: ${e}`)
-					})
 			})
 
 			// Path-specific xFeedback is registered in SubscriptionManager.attach() on 'ready'.
-		} catch (e: any) {
-			this.log('error', 'Error connecting to RoomOS device: ' + e.message)
-			this.xapi = undefined
-			this.connected = false
-			this.connecting = true
-			this.reset()
+			// Initial values come from xFeedback/Subscribe NotifyCurrentValue, not xGet.
+		} catch (e: unknown) {
+			this.log('error', 'Error connecting to RoomOS device: ' + formatXapiError(e))
+			this.dropConnection()
+			this.updateStatus(InstanceStatus.ConnectionFailure)
 		}
+	}
+
+	private dropConnection(): void {
+		this.connectionEpoch += 1
+		try {
+			this.subscriptions.detach()
+		} catch {
+			// ignore
+		}
+		const xapi = this.xapi
+		this.xapi = undefined
+		this.connected = false
+		this.connecting = false
+		if (xapi) {
+			try {
+				xapi.close()
+			} catch {
+				// ignore
+			}
+		}
+		this.reset()
+	}
+
+	private logTransportFailure(message: string): void {
+		const now = Date.now()
+		if (now - this.lastTransportErrorLogAt < TRANSPORT_ERROR_LOG_INTERVAL_MS) {
+			this.log('debug', `Cisco RoomOS connection error: ${message}`)
+			return
+		}
+		this.lastTransportErrorLogAt = now
+		this.log('error', `Cisco RoomOS connection error: ${message}`)
 	}
 
 	/**
@@ -313,14 +283,7 @@ export default class ControllerInstance extends RoomOSInstanceBase {
 	 * Clean up the instance before it is destroyed.
 	 */
 	public async destroy(): Promise<void> {
-		try {
-			this.subscriptions.detach()
-			if (this.xapi !== undefined) {
-				this.xapi.close()
-			}
-		} catch (e) {
-			// Ignore
-		}
+		this.dropConnection()
 
 		if (this.timer !== undefined) {
 			clearInterval(this.timer)

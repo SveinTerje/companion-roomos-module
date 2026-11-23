@@ -7,6 +7,7 @@ import {
 	combineRgb,
 } from '@companion-module/base'
 import { WebexCall, RoomOSInstanceBase, RoomOSOnOffBoolean, RoomOSBoolean } from './roomos.js'
+import { stringifyXapiValue } from './xapi-path.js'
 
 export enum FeedbackId {
 	Ringing = 'ringing',
@@ -136,13 +137,20 @@ export function HandleXAPIFeedback(instance: RoomOSInstanceBase, event: any): vo
 		newValues['outgoing_calls'] = String(currentlyOutgoingCalls.length)
 		newValues['ingoing_calls'] = String(currentlyIngoingCalls.length)
 		newValues['ingoing_ringing_calls'] = String(currentlyRingingCalls.length)
-	} else if (event.SystemUnit) {
-		console.log('SYSTEMUNIT: ', event.SystemUnit)
-	} else if (event.Conference) {
-		console.log('CONFERENCE: ', event.Conference)
-	} else if (event.Time) {
-		console.log('TIME: ', event.Time)
-		newValues['systemtime'] = event.Time.SystemTime
+	}
+
+	if (event.Conference) {
+		if (event.Conference.DoNotDisturb != null) newValues['DoNotDisturb'] = event.Conference.DoNotDisturb
+		if (event.Conference.SelectedCallProtocol != null) {
+			newValues['SelectedCallProtocol'] = event.Conference.SelectedCallProtocol
+		}
+		if (event.Conference.Presentation != null) {
+			newValues['Presentation'] = stringifyXapiValue(event.Conference.Presentation)
+		}
+	}
+
+	if (event.Time?.SystemTime != null) {
+		newValues['systemtime'] = stringifyXapiValue(event.Time.SystemTime)
 	}
 
 	instance.setVariableValues(newValues)
