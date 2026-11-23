@@ -68,7 +68,7 @@ After code changes, run `yarn build` (or `yarn dev` to rebuild on save). Compani
 
 ### 4. Check it loaded
 
-- `volume` and `number_of_active_calls` update without a subscribe action.
-- **xStatus: Subscribe** with e.g. `Standby State` creates `status_Standby_State`.
+- Standard variables such as `SystemUnit_Software_Version` appear in the picker but stay empty until **xStatus: Subscribe** activates them.
+- **xStatus: Subscribe** with e.g. custom `Standby State` creates `status_Standby_State`.
 - **xEvent: Subscribe** with `CallDisconnect` plus a **Triggers → Variable changed** entry on `event_CallDisconnect_count` fires when a call disconnects.
 

@@ -153,7 +153,7 @@ export function GetPresetsList(): {
 		
 		name: `Auto-answer mode`,
 		style: {
-			text: `AA\\n$(int:autoanswer_mode)`,
+			text: `Auto\\nanswer`,
 			size: '18',
 			color: combineRgb(255, 255, 255),
 			bgcolor: combineRgb(0, 0, 0),
@@ -186,7 +186,7 @@ export function GetPresetsList(): {
 		
 		name: `Show active ingoing calls`,
 		style: {
-			text: `Ingoing\\n$(int:ingoing_calls)`,
+			text: `Ingoing\\ncall`,
 			size: '14',
 			color: combineRgb(255, 255, 255),
 			bgcolor: combineRgb(0, 0, 0),
@@ -212,7 +212,7 @@ export function GetPresetsList(): {
 		
 		name: `Show active outgoing calls`,
 		style: {
-			text: `Outgoing\\n$(int:outgoing_calls)`,
+			text: `Outgoing\\ncall`,
 			size: '14',
 			color: combineRgb(255, 255, 255),
 			bgcolor: combineRgb(0, 0, 0),
@@ -238,7 +238,7 @@ export function GetPresetsList(): {
 		
 		name: `Show ingoing ringing calls`,
 		style: {
-			text: `Ringing\\n$(int:ingoing_ringing_calls)`,
+			text: `Ringing`,
 			size: '14',
 			color: combineRgb(255, 255, 255),
 			bgcolor: combineRgb(0, 0, 0),
@@ -259,12 +259,12 @@ export function GetPresetsList(): {
 			},
 		],
 	}
-	presets['visual_volume'] = {
+	presets['visual_software_version'] = {
 		type: 'simple',
 		
-		name: 'Show audio volume',
+		name: 'Show software version',
 		style: {
-			text: 'Vol\\n$(volume)',
+			text: 'SW\\n$(SystemUnit_Software_Version)',
 			size: '14',
 			color: combineRgb(255, 255, 255),
 			bgcolor: combineRgb(0, 0, 0),
@@ -312,7 +312,8 @@ export function GetPresetsList(): {
 					{
 						actionId: ActionId.SubscribeStatus,
 						options: {
-							path: 'Standby State',
+							standard: 'SystemUnit/Software/Version',
+							path: '',
 						},
 					},
 				],
@@ -485,7 +486,7 @@ export function GetPresetsList(): {
 				'visual_show_ingoing_calls',
 				'visual_show_outgoing_calls',
 				'visual_show_ingoing_ringing_calls',
-				'visual_volume',
+				'visual_software_version',
 				'visual_active_calls',
 			],
 		},

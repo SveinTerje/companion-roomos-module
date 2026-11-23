@@ -55,22 +55,16 @@ export function HandleXAPIConfFeedback(instance: RoomOSInstanceBase, event: any)
 	console.log('RoomOS CONFIG: ', instance.id, event)
 
 	if (event.Conference?.AutoAnswer) {
-		const newValues: CompanionVariableValues = {}
-
 		if (event.Conference?.AutoAnswer?.Mode) {
 			if (instance.autoAnswerConfig.Mode !== event.Conference?.AutoAnswer?.Mode) {
 				instance.autoAnswerConfig.Mode = event.Conference?.AutoAnswer?.Mode
 				instance.checkFeedbacks(FeedbackId.AutoAnswer)
 			}
-			newValues['autoanswer_mode'] = instance.autoAnswerConfig.Mode
 		}
 		instance.autoAnswerConfig = {
 			...instance.autoAnswerConfig,
 			...event.Conference?.AutoAnswer,
 		}
-		newValues['autoanswer_delay'] = instance.autoAnswerConfig.Delay
-
-		instance.setVariableValues(newValues)
 	}
 }
 
@@ -97,9 +91,6 @@ export function HandleXAPIFeedback(instance: RoomOSInstanceBase, event: any): vo
 			}
 			newValues['audio_connector_mute'] = muteState
 		}
-		if (event.Audio.Volume != null) newValues['volume'] = event.Audio.Volume
-		if (event.Audio.Microphones != undefined && event.Audio.Microphones.MusicMode != undefined)
-			newValues['microphones_musicmode'] = event.Audio.Microphones.MusicMode
 		if (event.Audio.Microphones != undefined && event.Audio.Microphones.Mute != undefined) {
 			newValues['microphones_mute'] = event.Audio.Microphones.Mute
 			instance.microphoneMute = event.Audio.Microphones.Mute == 'On' ? true : false
@@ -133,17 +124,9 @@ export function HandleXAPIFeedback(instance: RoomOSInstanceBase, event: any): vo
 			instance.hasOutgoingCall = currentlyHasOutgoingCalls
 			checkFeedbacks.push(FeedbackId.HasOutgoingCall)
 		}
-
-		newValues['outgoing_calls'] = String(currentlyOutgoingCalls.length)
-		newValues['ingoing_calls'] = String(currentlyIngoingCalls.length)
-		newValues['ingoing_ringing_calls'] = String(currentlyRingingCalls.length)
 	}
 
 	if (event.Conference) {
-		if (event.Conference.DoNotDisturb != null) newValues['DoNotDisturb'] = event.Conference.DoNotDisturb
-		if (event.Conference.SelectedCallProtocol != null) {
-			newValues['SelectedCallProtocol'] = event.Conference.SelectedCallProtocol
-		}
 		if (event.Conference.Presentation != null) {
 			newValues['Presentation'] = stringifyXapiValue(event.Conference.Presentation)
 		}

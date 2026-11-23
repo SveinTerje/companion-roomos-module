@@ -1,4 +1,5 @@
 import { normalizeXapiPath, pathToVariableId } from './xapi-path.js'
+import { findStandardStatus, statusVariableId } from './standard-status.js'
 import { formatXapiError, isTransportFailure, subscribeParamsWithCurrentValue } from './xapi-rpc.js'
 
 const normalizeCases: Array<[string, string]> = [
@@ -67,7 +68,22 @@ if (isTransportFailure({ code: -32603, message: 'Internal Error' })) {
 	failed++
 }
 
+const versionId = statusVariableId('xStatus SystemUnit Software Version')
+if (versionId.path !== 'SystemUnit/Software/Version' || versionId.variableId !== 'SystemUnit_Software_Version') {
+	console.error(`statusVariableId software version => ${JSON.stringify(versionId)}`)
+	failed++
+}
+if (!findStandardStatus('SystemUnit/Software/Version')) {
+	console.error('SystemUnit/Software/Version should be a standard status')
+	failed++
+}
+const customId = statusVariableId('Standby State')
+if (customId.variableId !== 'status_Standby_State') {
+	console.error(`custom statusVariableId => ${customId.variableId}`)
+	failed++
+}
+
 if (failed) {
 	process.exit(1)
 }
-console.log(`xapi-path selftest: ${normalizeCases.length + 2 + 5} checks ok`)
+console.log(`xapi-path selftest: ${normalizeCases.length + 2 + 8} checks ok`)

@@ -1,4 +1,5 @@
 import { RoomOSInstanceBase } from './roomos.js'
+import { STANDARD_STATUS_SUBSCRIPTIONS } from './standard-status.js'
 import { SetVariableDefinitions } from './variables.js'
 import {
 	CompanionActionDefinitions,
@@ -148,7 +149,7 @@ function customSubscriptionChoices(
 ): { id: string; label: string }[] {
 	const list = instance.subscriptions?.listCustom(kind) ?? []
 	if (list.length === 0) {
-		return [{ id: '', label: `No custom x${kind === 'status' ? 'Status' : 'Event'} subscriptions` }]
+		return [{ id: '', label: `No activated x${kind === 'status' ? 'Status' : 'Event'} subscriptions` }]
 	}
 	return list.map((s) => ({ id: s.path, label: `${s.path.replace(/\//g, ' ')} (${s.variableId})` }))
 }
@@ -165,16 +166,29 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 		name: 'xStatus: Subscribe',
 		options: [
 			{
+				type: 'dropdown',
+				label: 'Status',
+				id: 'standard',
+				default: 'SystemUnit/Software/Version',
+				choices: [
+					...STANDARD_STATUS_SUBSCRIPTIONS.map((s) => ({
+						id: s.path,
+						label: `${s.name} (${s.variableId})`,
+					})),
+					{ id: 'custom', label: 'Custom path…' },
+				],
+			},
+			{
 				type: 'textinput',
-				label: 'Path (e.g. Audio Volume or Status.Audio.Volume)',
+				label: 'Custom path (used when Status is Custom path…)',
 				id: 'path',
-				default: 'Audio Volume',
-				regex: Regex.SOMETHING,
+				default: '',
 				useVariables: true,
 			},
 		],
 		callback: async (action): Promise<void> => {
-			const path = String(action.options.path ?? '')
+			const standard = String(action.options.standard ?? '')
+			const path = standard && standard !== 'custom' ? standard : String(action.options.path ?? '')
 			const result = instance.subscriptions.subscribe('status', path)
 			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
 			if (result.ok) refreshAfterSubscriptionChange()

@@ -1,7 +1,8 @@
 import { CompanionVariableDefinition, CompanionVariableValues } from '@companion-module/base'
 import { XAPI } from 'jsxapi'
-import { HandleXAPIConfFeedback, HandleXAPIFeedback } from './feedback.js'
+import { FeedbackId, HandleXAPIFeedback } from './feedback.js'
 import { RoomOSInstanceBase } from './roomos.js'
+import { findStandardStatus, statusVariableId } from './standard-status.js'
 import {
 	XapiKind,
 	jsonXapiValue,
@@ -15,9 +16,6 @@ import { formatXapiError } from './xapi-rpc.js'
 /** Cisco allows at most 50 xFeedback expressions per session. */
 export const MAX_XFEEDBACK_EXPRESSIONS = 50
 
-/** Built-in path-specific registrations applied on every connect. */
-const BUILTIN_EXPRESSION_COUNT = 6
-
 export interface CustomSubscription {
 	kind: XapiKind
 	path: string
@@ -29,7 +27,6 @@ type OffFn = (() => void) & { registration?: Promise<unknown> }
 
 export class SubscriptionManager {
 	private xapi?: XAPI
-	private builtinOff: OffFn[] = []
 	private custom = new Map<string, CustomSubscription>()
 	private customOff = new Map<string, OffFn>()
 	private eventLastCount = 0
@@ -42,26 +39,19 @@ export class SubscriptionManager {
 	}
 
 	public liveExpressionCount(): number {
-		return this.builtinOff.length + this.customOff.size
+		return this.customOff.size
 	}
 
 	private plannedExpressionCount(): number {
-		const builtins = this.xapi ? this.builtinOff.length : BUILTIN_EXPRESSION_COUNT
-		return builtins + this.custom.size
+		return this.custom.size
 	}
 
 	public variableDefinitions(): Record<string, CompanionVariableDefinition> {
-		const defs: Record<string, CompanionVariableDefinition> = {
-			xfeedback_count: { name: 'Number of xFeedback expressions on this connection' },
-			event_last_path: { name: 'Last xEvent path' },
-			event_last_value: { name: 'Last xEvent value' },
-			event_last_json: { name: 'Last xEvent JSON payload' },
-			event_last_time: { name: 'Last xEvent timestamp' },
-			event_last_count: { name: 'Last xEvent sequence (use for Companion variable-changed triggers)' },
-		}
+		const defs: Record<string, CompanionVariableDefinition> = {}
 
 		for (const sub of this.custom.values()) {
 			if (sub.kind === 'status') {
+				if (findStandardStatus(sub.path)) continue
 				defs[sub.variableId] = { name: `xStatus ${sub.path.replace(/\//g, ' ')}` }
 			} else {
 				defs[sub.variableId] = { name: `xEvent ${sub.path.replace(/\//g, ' ')}` }
@@ -79,7 +69,6 @@ export class SubscriptionManager {
 	public attach(xapi: XAPI): void {
 		this.detach()
 		this.xapi = xapi
-		this.applyBuiltins(xapi)
 		for (const sub of this.custom.values()) {
 			this.activateCustom(xapi, sub)
 		}
@@ -87,14 +76,6 @@ export class SubscriptionManager {
 	}
 
 	public detach(): void {
-		for (const off of this.builtinOff) {
-			try {
-				off()
-			} catch {
-				// ignore
-			}
-		}
-		this.builtinOff = []
 		for (const off of this.customOff.values()) {
 			try {
 				off()
@@ -130,7 +111,7 @@ export class SubscriptionManager {
 			}
 		}
 
-		const variableId = pathToVariableId(kind, path)
+		const variableId = kind === 'status' ? statusVariableId(path).variableId : pathToVariableId(kind, path)
 		const sub: CustomSubscription = { kind, path, variableId, count: 0 }
 		this.custom.set(key, sub)
 
@@ -152,63 +133,30 @@ export class SubscriptionManager {
 			return { ok: false, message: 'Path is empty' }
 		}
 		const key = subscriptionKey(kind, path)
-		if (!this.custom.has(key)) {
-			return { ok: false, message: `No custom ${kind} subscription for ${path}` }
+		const sub = this.custom.get(key)
+		if (!sub) {
+			return { ok: false, message: `No ${kind} subscription for ${path}` }
 		}
 		this.deactivateCustom(key)
 		this.custom.delete(key)
+		if (sub.kind === 'status') {
+			this.instance.setVariableValues({ [sub.variableId]: '' })
+		}
 		this.publishCount()
 		return { ok: true, message: `Unsubscribed ${kind} ${path}` }
 	}
 
 	public unsubscribeAllCustom(): { ok: boolean; message: string } {
 		const n = this.custom.size
-		for (const key of [...this.custom.keys()]) {
+		const cleared: CompanionVariableValues = {}
+		for (const [key, sub] of [...this.custom.entries()]) {
 			this.deactivateCustom(key)
 			this.custom.delete(key)
+			if (sub.kind === 'status') cleared[sub.variableId] = ''
 		}
+		if (Object.keys(cleared).length) this.instance.setVariableValues(cleared)
 		this.publishCount()
-		return { ok: true, message: `Removed ${n} custom subscription(s)` }
-	}
-
-	private applyBuiltins(xapi: XAPI): void {
-		this.trackBuiltin(
-			xapi.status.on('Audio', (event: unknown) => {
-				HandleXAPIFeedback(this.instance, { Audio: event })
-			}) as OffFn
-		)
-		this.trackBuiltin(
-			xapi.status.on('Call', (event: unknown) => {
-				HandleXAPIFeedback(this.instance, { Call: this.normalizeCallPayload(event) })
-			}) as OffFn
-		)
-		this.trackBuiltin(
-			xapi.status.on('Conference', (event: unknown) => {
-				HandleXAPIFeedback(this.instance, { Conference: event })
-			}) as OffFn
-		)
-		this.trackBuiltin(
-			xapi.status.on('Time', (event: unknown) => {
-				HandleXAPIFeedback(this.instance, { Time: event })
-			}) as OffFn
-		)
-		this.trackBuiltin(
-			xapi.status.on('SystemUnit/State/NumberOfActiveCalls', (value: unknown) => {
-				this.instance.setVariableValues({ number_of_active_calls: stringifyXapiValue(value) })
-			}) as OffFn
-		)
-		this.trackBuiltin(
-			xapi.config.on('Conference/AutoAnswer', (event: unknown) => {
-				HandleXAPIConfFeedback(this.instance, { Conference: { AutoAnswer: event } })
-			}) as OffFn
-		)
-	}
-
-	private trackBuiltin(off: OffFn): void {
-		this.builtinOff.push(off)
-		off.registration?.catch((e: unknown) => {
-			this.instance.log('warn', `xFeedback subscribe failed: ${formatXapiError(e)}`)
-		})
+		return { ok: true, message: `Removed ${n} subscription(s)` }
 	}
 
 	private activateCustom(xapi: XAPI, sub: CustomSubscription): void {
@@ -217,7 +165,8 @@ export class SubscriptionManager {
 
 		if (sub.kind === 'status') {
 			const off = xapi.status.on(sub.path, (value: unknown) => {
-				this.instance.setVariableValues({ [sub.variableId]: stringifyXapiValue(value) })
+				this.instance.setVariableValues({ [sub.variableId]: this.formatStatusValue(sub, value) })
+				this.syncCompanionState(sub.path, value)
 			}) as OffFn
 			this.customOff.set(key, off)
 			off.registration?.catch((e: unknown) => {
@@ -269,6 +218,36 @@ export class SubscriptionManager {
 		return `variables ${sub.variableId} / ${sub.variableId}_count (trigger on _count)`
 	}
 
+	private formatStatusValue(sub: CustomSubscription, value: unknown): string {
+		if (sub.variableId === 'audio_connector_mute') {
+			return formatMicrophoneConnectors(value)
+		}
+		return stringifyXapiValue(value)
+	}
+
+	private syncCompanionState(path: string, value: unknown): void {
+		if (path === 'Call' || path.startsWith('Call/')) {
+			HandleXAPIFeedback(this.instance, { Call: this.normalizeCallPayload(value) })
+			return
+		}
+		if (path === 'Audio/Microphones/Mute') {
+			this.instance.microphoneMute = stringifyXapiValue(value) === 'On'
+			this.instance.checkFeedbacks(FeedbackId.MicrophoneMute)
+			return
+		}
+		if (path === 'Audio' || path.startsWith('Audio/')) {
+			HandleXAPIFeedback(this.instance, nestStatus('Audio', path, value))
+			return
+		}
+		if (path === 'Conference' || path.startsWith('Conference/')) {
+			HandleXAPIFeedback(this.instance, nestStatus('Conference', path, value))
+			return
+		}
+		if (path === 'Time' || path.startsWith('Time/')) {
+			HandleXAPIFeedback(this.instance, nestStatus('Time', path, value))
+		}
+	}
+
 	private normalizeCallPayload(event: unknown): unknown[] {
 		if (event == null) return []
 		if (Array.isArray(event)) return event
@@ -281,4 +260,27 @@ export class SubscriptionManager {
 		}
 		return []
 	}
+}
+
+function nestStatus(root: string, path: string, value: unknown): Record<string, unknown> {
+	const parts = path.split('/').filter(Boolean)
+	if (parts[0] !== root) {
+		return { [root]: value }
+	}
+	let cursor: unknown = value
+	for (let i = parts.length - 1; i >= 1; i--) {
+		cursor = { [parts[i]]: cursor }
+	}
+	return { [root]: cursor }
+}
+
+function formatMicrophoneConnectors(value: unknown): string {
+	const list = Array.isArray(value) ? value : value && typeof value === 'object' ? [value] : []
+	let muteState = ''
+	for (const element of list) {
+		if (!element || typeof element !== 'object') continue
+		const rec = element as { id?: unknown; Mute?: unknown }
+		muteState += `(Mic ${String(rec.id ?? '')} Mute: ${String(rec.Mute ?? '')})`
+	}
+	return muteState
 }

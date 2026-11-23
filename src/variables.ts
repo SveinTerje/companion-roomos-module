@@ -1,44 +1,42 @@
 import { CompanionVariableDefinition } from '@companion-module/base'
 import { RoomOSInstanceBase } from './roomos.js'
+import { standardVariableDefinitions } from './standard-status.js'
 
-export function GetBuiltinVariableDefinitions(): Record<string, CompanionVariableDefinition> {
+export function GetSessionVariableDefinitions(): Record<string, CompanionVariableDefinition> {
 	return {
-		outgoing_calls: { name: `Number of outgoing calls` },
-		ingoing_calls: { name: `Number of ingoing calls` },
-		ingoing_ringing_calls: { name: `Number of ingoing actively ringing calls` },
-		autoanswer_mode: { name: `Auto answer activated` },
-		autoanswer_mute: { name: `Incoming call will be muted (on)` },
-		autoanswer_delay: { name: `Autoanswer delay` },
-		systemtime: { name: `System Time on connection` },
-		selected_device: { name: 'Audio: Selected device' },
-		volume: { name: 'Audio: Volume' },
-		microphones_musicmode: { name: 'Audio: Microphones Music Mode' },
-		microphones_mute: { name: 'Audio: Microphones Mute' },
-		audio_connector_mute: { name: 'Audio: connectors mute' },
-		DoNotDisturb: { name: 'Conference: Do not disturb' },
-		Presentation: { name: 'Conference: Presentation' },
-		SelectedCallProtocol: { name: 'Conference: SelectedCallProtocol' },
-		number_of_active_calls: { name: 'SystemUnit: Number of active calls' },
+		xfeedback_count: { name: 'Number of xFeedback expressions on this connection' },
+		event_last_path: { name: 'Last xEvent path' },
+		event_last_value: { name: 'Last xEvent value' },
+		event_last_json: { name: 'Last xEvent JSON payload' },
+		event_last_time: { name: 'Last xEvent timestamp' },
+		event_last_count: { name: 'Last xEvent sequence (use for Companion variable-changed triggers)' },
 	}
 }
 
 export function SetVariableDefinitions(instance: RoomOSInstanceBase): void {
 	const extra = instance.subscriptions ? instance.subscriptions.variableDefinitions() : {}
-	instance.setVariableDefinitions({ ...GetBuiltinVariableDefinitions(), ...extra })
+	instance.setVariableDefinitions({
+		...GetSessionVariableDefinitions(),
+		...standardVariableDefinitions(),
+		...extra,
+	})
 }
 
 export function InitVariables(instance: RoomOSInstanceBase): void {
 	SetVariableDefinitions(instance)
 	instance.setVariableValues({
-		outgoing_calls: '0',
-		ingoing_calls: '0',
-		ingoing_ringing_calls: '0',
-		number_of_active_calls: '0',
 		xfeedback_count: '0',
 		event_last_path: '',
 		event_last_value: '',
 		event_last_json: '',
 		event_last_time: '',
 		event_last_count: '0',
+		SystemUnit_Software_Version: '',
+		number_of_active_calls: '',
+		selected_device: '',
+		microphones_mute: '',
+		audio_connector_mute: '',
+		systemtime: '',
+		Presentation: '',
 	})
 }

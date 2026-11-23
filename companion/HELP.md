@@ -17,29 +17,47 @@ Subscriptions are per connection. After a reconnect this module re-subscribes au
 
 Cisco allows **at most 50** `xFeedback` expressions on one session. This module never registers `/Status` as a whole.
 
-### Built-in xStatus (always subscribed)
+### Session variables (always present)
+
+These are not codec xStatus nodes. They do not use an xFeedback slot.
+
+| Variable | Meaning |
+| --- | --- |
+| `event_last_path` | Path of the most recent **subscribed** xEvent (for example `CallDisconnect`). Empty until an xEvent subscription fires. |
+| `event_last_value` | That event’s payload as a string (or JSON if the payload is an object). |
+| `event_last_json` | The same payload always as JSON. Use this when you need to parse fields. |
+| `event_last_time` | ISO timestamp when that event arrived (this computer’s clock). |
+| `event_last_count` | Monotonic counter of every subscribed xEvent. Use **Triggers → Variable changed** on this when you want “any event”, including repeats with the same payload. |
+| `xfeedback_count` | How many xFeedback expressions are registered on the current session. |
+
+### Standard xStatus (assignable, not subscribed until activated)
+
+These variables appear in Companion’s variable picker so you can put them on a button. They stay empty and **do not register xFeedback** until you run **xStatus: Subscribe** and choose that status (or type the path).
 
 | Path | Variable |
 | --- | --- |
-| `Audio Volume` | `volume` |
+| `SystemUnit Software Version` | `SystemUnit_Software_Version` |
 | `SystemUnit State NumberOfActiveCalls` | `number_of_active_calls` |
+| `Audio SelectedDevice` | `selected_device` |
+| `Audio Microphones Mute` | `microphones_mute` |
+| `Audio Input Connectors Microphone` | `audio_connector_mute` |
+| `Time SystemTime` | `systemtime` |
+| `Conference Presentation` | `Presentation` |
 
-Call, mute, auto-answer and the other existing variables still update. They use specific xStatus/xConfiguration paths, not the entire Status tree.
+Cisco allows **at most 50** xFeedback expressions. Activating only what you use keeps slots free.
 
 ### xStatus: Subscribe / Unsubscribe
 
-The generic subscribe action is the main way to use more of the xAPI.
-
 1. Add action **xStatus: Subscribe**.
-2. Enter a path. These forms all work:
+2. Choose a **standard** status from the dropdown, or **Custom path…** and enter a path. These custom forms all work:
    - `Audio Volume`
    - `xStatus Audio Volume`
    - `Status.Audio.Volume`
    - `/Status/Audio/Volume`
-3. A Companion variable is created, named `status_` + the path with underscores, for example `status_Standby_State`.
+3. A custom path creates `status_` + the path with underscores, for example `status_Standby_State`. Standard paths keep the names in the table above.
 4. Put that variable on a button if you want it visible. This module does not add a colour feedback for generic paths.
 
-**xStatus: Unsubscribe** lists current custom status subscriptions. Built-in paths cannot be removed from this list.
+**xStatus: Unsubscribe** lists currently **activated** status subscriptions.
 
 ### xEvent: Subscribe / Unsubscribe
 
