@@ -1,13 +1,17 @@
-import { CompanionPresetDefinitions, combineRgb } from '@companion-module/base'
+import { CompanionPresetDefinitions, CompanionPresetSection, combineRgb } from '@companion-module/base'
 import { ActionId } from './actions.js'
 import { FeedbackId } from './feedback.js'
+import type { RoomOSTypes } from './roomos.js'
 
-export function GetPresetsList(): CompanionPresetDefinitions {
-	const presets: CompanionPresetDefinitions = {}
+export function GetPresetsList(): {
+	structure: CompanionPresetSection<RoomOSTypes>[]
+	presets: CompanionPresetDefinitions<RoomOSTypes>
+} {
+	const presets: CompanionPresetDefinitions<RoomOSTypes> = {}
 
 	presets['general_dial'] = {
-		type: 'button',
-		category: 'General functions',
+		type: 'simple',
+		
 		name: `Dial`,
 		style: {
 			text: `Dial`,
@@ -39,8 +43,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['audio_volume'] = {
-		type: 'button',
-		category: 'Audio',
+		type: 'simple',
+		
 		name: `Audio volume`,
 		style: {
 			text: `Audio volume`,
@@ -64,8 +68,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['audio_mic_mute'] = {
-		type: 'button',
-		category: 'Audio',
+		type: 'simple',
+		
 		name: `Microphone mute`,
 		style: {
 			text: `Microphone mute`,
@@ -97,8 +101,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['general_accept_all_calls'] = {
-		type: 'button',
-		category: 'General functions',
+		type: 'simple',
+		
 		name: `Accept all calls`,
 		style: {
 			text: `Accept call`,
@@ -120,8 +124,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['general_disconnect'] = {
-		type: 'button',
-		category: 'General functions',
+		type: 'simple',
+		
 		name: `Disconnect`,
 		style: {
 			text: `Disconnect`,
@@ -145,8 +149,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['general_auto_answer'] = {
-		type: 'button',
-		category: 'General functions',
+		type: 'simple',
+		
 		name: `Auto-answer mode`,
 		style: {
 			text: `AA\\n$(int:autoanswer_mode)`,
@@ -178,8 +182,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['visual_show_ingoing_calls'] = {
-		type: 'button',
-		category: 'Visual buttons',
+		type: 'simple',
+		
 		name: `Show active ingoing calls`,
 		style: {
 			text: `Ingoing\\n$(int:ingoing_calls)`,
@@ -204,8 +208,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['visual_show_outgoing_calls'] = {
-		type: 'button',
-		category: 'Visual buttons',
+		type: 'simple',
+		
 		name: `Show active outgoing calls`,
 		style: {
 			text: `Outgoing\\n$(int:outgoing_calls)`,
@@ -230,8 +234,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['visual_show_ingoing_ringing_calls'] = {
-		type: 'button',
-		category: 'Visual buttons',
+		type: 'simple',
+		
 		name: `Show ingoing ringing calls`,
 		style: {
 			text: `Ringing\\n$(int:ingoing_ringing_calls)`,
@@ -256,8 +260,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['visual_volume'] = {
-		type: 'button',
-		category: 'Visual buttons',
+		type: 'simple',
+		
 		name: 'Show audio volume',
 		style: {
 			text: 'Vol\\n$(volume)',
@@ -274,8 +278,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['visual_active_calls'] = {
-		type: 'button',
-		category: 'Visual buttons',
+		type: 'simple',
+		
 		name: 'Show number of active calls',
 		style: {
 			text: 'Calls\\n$(number_of_active_calls)',
@@ -292,8 +296,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['subscribe_xstatus'] = {
-		type: 'button',
-		category: 'xAPI subscriptions',
+		type: 'simple',
+		
 		name: 'Subscribe xStatus',
 		style: {
 			text: 'Sub\\nxStatus',
@@ -317,8 +321,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['subscribe_xevent'] = {
-		type: 'button',
-		category: 'xAPI subscriptions',
+		type: 'simple',
+		
 		name: 'Subscribe xEvent',
 		style: {
 			text: 'Sub\\nxEvent',
@@ -342,8 +346,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['custom-xconfig'] = {
-		type: 'button',
-		category: 'Custom',
+		type: 'simple',
+		
 		name: `Custom xConfiguration`,
 		style: {
 			text: 'custom\\nxConfiguration',
@@ -368,8 +372,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['custom_xcommand'] = {
-		type: 'button',
-		category: 'Custom',
+		type: 'simple',
+		
 		name: `Custom xCommand`,
 		style: {
 			text: 'custom\\nxCommand',
@@ -394,8 +398,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['osd_key_click'] = {
-		type: 'button',
-		category: 'OSD',
+		type: 'simple',
+		
 		name: `OSD Key Click`,
 		style: {
 			text: 'OSD Click',
@@ -417,8 +421,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['osd_key_press'] = {
-		type: 'button',
-		category: 'OSD',
+		type: 'simple',
+		
 		name: `OSD Key Press`,
 		style: {
 			text: 'OSD Press',
@@ -440,8 +444,8 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 	presets['osd_key_release'] = {
-		type: 'button',
-		category: 'OSD',
+		type: 'simple',
+		
 		name: `OSD Key Release`,
 		style: {
 			text: 'OSD Release',
@@ -463,5 +467,44 @@ export function GetPresetsList(): CompanionPresetDefinitions {
 		],
 	}
 
-	return presets
+	const structure: CompanionPresetSection[] = [
+		{
+			id: 'general',
+			name: 'General functions',
+			definitions: ['general_dial', 'general_accept_all_calls', 'general_disconnect', 'general_auto_answer'],
+		},
+		{
+			id: 'audio',
+			name: 'Audio',
+			definitions: ['audio_volume', 'audio_mic_mute'],
+		},
+		{
+			id: 'visual',
+			name: 'Visual buttons',
+			definitions: [
+				'visual_show_ingoing_calls',
+				'visual_show_outgoing_calls',
+				'visual_show_ingoing_ringing_calls',
+				'visual_volume',
+				'visual_active_calls',
+			],
+		},
+		{
+			id: 'xapi',
+			name: 'xAPI subscriptions',
+			definitions: ['subscribe_xstatus', 'subscribe_xevent'],
+		},
+		{
+			id: 'custom',
+			name: 'Custom',
+			definitions: ['custom-xconfig', 'custom_xcommand'],
+		},
+		{
+			id: 'osd',
+			name: 'OSD',
+			definitions: ['osd_key_click', 'osd_key_press', 'osd_key_release'],
+		},
+	]
+
+	return { structure, presets }
 }

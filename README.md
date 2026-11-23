@@ -12,9 +12,9 @@ This module is not in the Companion store yet. Load it locally. Companion scans 
 
 You need:
 
-- [Companion](https://bitfocus.io/companion) 4.x
+- [Companion](https://bitfocus.io/companion) **5.x** (this module does not load on Companion 4.x)
 - [Git](https://git-scm.com/downloads)
-- [Node.js](https://nodejs.org/) 22 (Yarn may still warn about engines from older dependencies; add `--ignore-engines` if install fails)
+- [Node.js](https://nodejs.org/) 22 or later for the local build (Companion 5 runs the module on Node 26)
 - [Yarn 1](https://classic.yarnpkg.com/en/docs/install) (`npm install -g yarn`)
 
 ### 1. Create a developer folder and clone this repo

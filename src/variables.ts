@@ -1,84 +1,33 @@
 import { CompanionVariableDefinition } from '@companion-module/base'
-import { DeviceConfig } from './config.js'
 import { RoomOSInstanceBase } from './roomos.js'
 
-export function GetBuiltinVariableDefinitions(): CompanionVariableDefinition[] {
-	const variables: CompanionVariableDefinition[] = []
-
-	variables.push({
-		name: `Number of outgoing calls`,
-		variableId: `outgoing_calls`,
-	})
-	variables.push({
-		name: `Number of ingoing calls`,
-		variableId: `ingoing_calls`,
-	})
-	variables.push({
-		name: `Number of ingoing actively ringing calls`,
-		variableId: `ingoing_ringing_calls`,
-	})
-	variables.push({
-		name: `Auto answer activated`,
-		variableId: `autoanswer_mode`,
-	})
-	variables.push({
-		name: `Incoming call will be muted (on)`,
-		variableId: `autoanswer_mute`,
-	})
-	variables.push({
-		name: `Autoanswer delay`,
-		variableId: `autoanswer_delay`,
-	})
-	variables.push({
-		name: `System Time on connection`,
-		variableId: `systemtime`,
-	})
-	variables.push({
-		name: 'Audio: Selected device',
-		variableId: 'selected_device',
-	})
-	variables.push({
-		name: 'Audio: Volume',
-		variableId: 'volume',
-	})
-	variables.push({
-		name: 'Audio: Microphones Music Mode',
-		variableId: 'microphones_musicmode',
-	})
-	variables.push({
-		name: 'Audio: Microphones Mute',
-		variableId: 'microphones_mute',
-	})
-	variables.push({
-		name: 'Audio: connectors mute',
-		variableId: 'audio_connector_mute',
-	})
-	variables.push({
-		name: 'Conference: Do not disturb',
-		variableId: 'DoNotDisturb',
-	})
-	variables.push({
-		name: 'Conference: Presentation',
-		variableId: 'Presentation',
-	})
-	variables.push({
-		name: 'Conference: SelectedCallProtocol',
-		variableId: 'SelectedCallProtocol',
-	})
-	variables.push({
-		name: 'SystemUnit: Number of active calls',
-		variableId: 'number_of_active_calls',
-	})
-
-	return variables
+export function GetBuiltinVariableDefinitions(): Record<string, CompanionVariableDefinition> {
+	return {
+		outgoing_calls: { name: `Number of outgoing calls` },
+		ingoing_calls: { name: `Number of ingoing calls` },
+		ingoing_ringing_calls: { name: `Number of ingoing actively ringing calls` },
+		autoanswer_mode: { name: `Auto answer activated` },
+		autoanswer_mute: { name: `Incoming call will be muted (on)` },
+		autoanswer_delay: { name: `Autoanswer delay` },
+		systemtime: { name: `System Time on connection` },
+		selected_device: { name: 'Audio: Selected device' },
+		volume: { name: 'Audio: Volume' },
+		microphones_musicmode: { name: 'Audio: Microphones Music Mode' },
+		microphones_mute: { name: 'Audio: Microphones Mute' },
+		audio_connector_mute: { name: 'Audio: connectors mute' },
+		DoNotDisturb: { name: 'Conference: Do not disturb' },
+		Presentation: { name: 'Conference: Presentation' },
+		SelectedCallProtocol: { name: 'Conference: SelectedCallProtocol' },
+		number_of_active_calls: { name: 'SystemUnit: Number of active calls' },
+	}
 }
 
-export function SetVariableDefinitions(instance: RoomOSInstanceBase<DeviceConfig>): void {
-	const extra = instance.subscriptions ? instance.subscriptions.variableDefinitions() : []
-	instance.setVariableDefinitions([...GetBuiltinVariableDefinitions(), ...extra])
+export function SetVariableDefinitions(instance: RoomOSInstanceBase): void {
+	const extra = instance.subscriptions ? instance.subscriptions.variableDefinitions() : {}
+	instance.setVariableDefinitions({ ...GetBuiltinVariableDefinitions(), ...extra })
 }
 
-export function InitVariables(instance: RoomOSInstanceBase<DeviceConfig>): void {
+export function InitVariables(instance: RoomOSInstanceBase): void {
 	SetVariableDefinitions(instance)
 	instance.setVariableValues({
 		outgoing_calls: '0',

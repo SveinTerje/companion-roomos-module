@@ -6,7 +6,6 @@ import {
 	CompanionVariableValues,
 	combineRgb,
 } from '@companion-module/base'
-import { DeviceConfig } from './config.js'
 import { WebexCall, RoomOSInstanceBase, RoomOSOnOffBoolean, RoomOSBoolean } from './roomos.js'
 
 export enum FeedbackId {
@@ -33,7 +32,7 @@ export function BackgroundPicker(color: number): CompanionInputFieldColor {
 		default: color,
 	}
 }
-export function HandleXAPICall(instance: RoomOSInstanceBase<DeviceConfig>, call: WebexCall): void {
+export function HandleXAPICall(instance: RoomOSInstanceBase, call: WebexCall): void {
 	if (call.ghost === RoomOSBoolean.True) {
 		instance.ongoingCalls = instance.ongoingCalls.filter((existingCall) => existingCall.id !== call.id)
 	} else {
@@ -51,7 +50,7 @@ export function HandleXAPICall(instance: RoomOSInstanceBase<DeviceConfig>, call:
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function HandleXAPIConfFeedback(instance: RoomOSInstanceBase<DeviceConfig>, event: any): void {
+export function HandleXAPIConfFeedback(instance: RoomOSInstanceBase, event: any): void {
 	console.log('RoomOS CONFIG: ', instance.id, event)
 
 	if (event.Conference?.AutoAnswer) {
@@ -75,7 +74,7 @@ export function HandleXAPIConfFeedback(instance: RoomOSInstanceBase<DeviceConfig
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export function HandleXAPIFeedback(instance: RoomOSInstanceBase<DeviceConfig>, event: any): void {
+export function HandleXAPIFeedback(instance: RoomOSInstanceBase, event: any): void {
 	// console.log('RoomOS EVENT: ', instance.id, event)
 
 	const newValues: CompanionVariableValues = {}
@@ -147,10 +146,12 @@ export function HandleXAPIFeedback(instance: RoomOSInstanceBase<DeviceConfig>, e
 	}
 
 	instance.setVariableValues(newValues)
-	if (checkFeedbacks.length) instance.checkFeedbacks(...checkFeedbacks)
+	if (checkFeedbacks.length > 0) {
+		instance.checkFeedbacks(checkFeedbacks[0], ...checkFeedbacks.slice(1))
+	}
 }
 
-export function GetFeedbacksList(instance: RoomOSInstanceBase<DeviceConfig>): CompanionFeedbackDefinitions {
+export function GetFeedbacksList(instance: RoomOSInstanceBase): CompanionFeedbackDefinitions {
 	const feedbacks: CompanionFeedbackDefinitions = {}
 
 	const getOptColors = (feedback: CompanionFeedbackAdvancedEvent): CompanionAdvancedFeedbackResult => ({
@@ -163,6 +164,7 @@ export function GetFeedbacksList(instance: RoomOSInstanceBase<DeviceConfig>): Co
 		name: 'Change colors if device is ringing',
 		description: 'If the device is has a ingoing call, change colors of the bank',
 		options: [ForegroundPicker(combineRgb(0, 0, 0)), BackgroundPicker(combineRgb(255, 255, 0))],
+		affectedProperties: ['bgcolor', 'color'],
 		callback: (feedback): CompanionAdvancedFeedbackResult => {
 			if (instance.hasRingingCall) {
 				return getOptColors(feedback)
@@ -176,6 +178,7 @@ export function GetFeedbacksList(instance: RoomOSInstanceBase<DeviceConfig>): Co
 		name: 'Change colors if device has ingoing calls',
 		description: 'If the device is has any calls in ingoing direction, change colors of the bank',
 		options: [ForegroundPicker(combineRgb(0, 0, 0)), BackgroundPicker(combineRgb(0, 255, 0))],
+		affectedProperties: ['bgcolor', 'color'],
 		callback: (feedback): CompanionAdvancedFeedbackResult => {
 			if (instance.hasIngoingCall) {
 				return getOptColors(feedback)
@@ -189,6 +192,7 @@ export function GetFeedbacksList(instance: RoomOSInstanceBase<DeviceConfig>): Co
 		name: 'Change colors if device has outgoing calls',
 		description: 'If the device is has any calls in outgoing direction, change colors of the bank',
 		options: [ForegroundPicker(combineRgb(0, 0, 0)), BackgroundPicker(combineRgb(0, 255, 0))],
+		affectedProperties: ['bgcolor', 'color'],
 		callback: (feedback): CompanionAdvancedFeedbackResult => {
 			if (instance.hasOutgoingCall) {
 				return getOptColors(feedback)
@@ -202,6 +206,7 @@ export function GetFeedbacksList(instance: RoomOSInstanceBase<DeviceConfig>): Co
 		name: 'Change colors if device is set to auto-answer calls',
 		description: 'If the device is set to auto-answer, change colors of the bank',
 		options: [ForegroundPicker(combineRgb(0, 0, 0)), BackgroundPicker(combineRgb(255, 255, 255))],
+		affectedProperties: ['bgcolor', 'color'],
 		callback: (feedback): CompanionAdvancedFeedbackResult => {
 			if (instance.autoAnswerConfig.Mode === RoomOSOnOffBoolean.On) {
 				return getOptColors(feedback)
@@ -215,6 +220,7 @@ export function GetFeedbacksList(instance: RoomOSInstanceBase<DeviceConfig>): Co
 		name: 'Change colors if microphone is set mute',
 		description: 'If the microphone is set mute, change colors of the bank',
 		options: [ForegroundPicker(combineRgb(0, 0, 0)), BackgroundPicker(combineRgb(255, 0, 0))],
+		affectedProperties: ['bgcolor', 'color'],
 		callback: (feedback): CompanionAdvancedFeedbackResult => {
 			if (instance.microphoneMute) {
 				return getOptColors(feedback)

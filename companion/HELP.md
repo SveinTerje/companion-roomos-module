@@ -1,6 +1,6 @@
 ## Cisco RoomOS module
 
-This module connects to Cisco RoomOS devices over **WebSocket** (preferred) or SSH using [jsxapi](https://www.npmjs.com/package/jsxapi). xAPI reference: [roomos.cisco.com/xapi](https://roomos.cisco.com/xapi)
+This module requires **Companion 5.x**. It connects to Cisco RoomOS devices over **WebSocket** (preferred) or SSH using [jsxapi](https://www.npmjs.com/package/jsxapi). xAPI reference: [roomos.cisco.com/xapi](https://roomos.cisco.com/xapi)
 
 ### Connection
 

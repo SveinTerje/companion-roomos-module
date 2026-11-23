@@ -1,6 +1,6 @@
-import WebSocket = require('ws')
+import { InstanceBase, InstanceTypes } from '@companion-module/base'
 import { XAPI } from 'jsxapi'
-import { InstanceBase } from '@companion-module/base'
+import type { DeviceConfig } from './config.js'
 import type { SubscriptionManager } from './subscriptions.js'
 
 interface Connector {
@@ -49,8 +49,12 @@ export interface WebexCall {
 	Ice: string
 }
 
-export abstract class RoomOSInstanceBase<T> extends InstanceBase<T> {
-	public websocket?: WebSocket
+export interface RoomOSTypes extends InstanceTypes {
+	config: DeviceConfig
+	secrets: undefined
+}
+
+export abstract class RoomOSInstanceBase extends InstanceBase<RoomOSTypes> {
 	public xapi?: XAPI
 	public subscriptions!: SubscriptionManager
 	public CallId!: string

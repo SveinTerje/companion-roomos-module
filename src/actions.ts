@@ -1,5 +1,4 @@
 import { RoomOSInstanceBase } from './roomos.js'
-import { DeviceConfig } from './config.js'
 import { SetVariableDefinitions } from './variables.js'
 import {
 	CompanionActionDefinitions,
@@ -144,7 +143,7 @@ function SourceIdNumber(): CompanionInputFieldNumber {
 }
 
 function customSubscriptionChoices(
-	instance: RoomOSInstanceBase<DeviceConfig>,
+	instance: RoomOSInstanceBase,
 	kind: 'status' | 'event'
 ): { id: string; label: string }[] {
 	const list = instance.subscriptions?.listCustom(kind) ?? []
@@ -154,16 +153,8 @@ function customSubscriptionChoices(
 	return list.map((s) => ({ id: s.path, label: `${s.path.replace(/\//g, ' ')} (${s.variableId})` }))
 }
 
-export function GetActionsList(instance: RoomOSInstanceBase<DeviceConfig>): CompanionActionDefinitions {
+export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDefinitions {
 	const actions: CompanionActionDefinitions = {}
-
-	const parsePath = async (raw: unknown): Promise<string> => {
-		const text = String(raw ?? '')
-		if (typeof instance.parseVariablesInString === 'function') {
-			return instance.parseVariablesInString(text)
-		}
-		return text
-	}
 
 	const refreshAfterSubscriptionChange = (): void => {
 		SetVariableDefinitions(instance)
@@ -180,10 +171,10 @@ export function GetActionsList(instance: RoomOSInstanceBase<DeviceConfig>): Comp
 				default: 'Audio Volume',
 				regex: Regex.SOMETHING,
 				useVariables: true,
-			} as any,
+			},
 		],
 		callback: async (action): Promise<void> => {
-			const path = await parsePath(action.options.path)
+			const path = String(action.options.path ?? '')
 			const result = instance.subscriptions.subscribe('status', path)
 			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
 			if (result.ok) refreshAfterSubscriptionChange()
@@ -201,7 +192,7 @@ export function GetActionsList(instance: RoomOSInstanceBase<DeviceConfig>): Comp
 			},
 		],
 		callback: async (action): Promise<void> => {
-			const path = await parsePath(action.options.path)
+			const path = String(action.options.path ?? '')
 			const result = instance.subscriptions.unsubscribe('status', path)
 			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
 			if (result.ok) refreshAfterSubscriptionChange()
@@ -217,10 +208,10 @@ export function GetActionsList(instance: RoomOSInstanceBase<DeviceConfig>): Comp
 				default: 'CallDisconnect',
 				regex: Regex.SOMETHING,
 				useVariables: true,
-			} as any,
+			},
 		],
 		callback: async (action): Promise<void> => {
-			const path = await parsePath(action.options.path)
+			const path = String(action.options.path ?? '')
 			const result = instance.subscriptions.subscribe('event', path)
 			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
 			if (result.ok) refreshAfterSubscriptionChange()
@@ -238,7 +229,7 @@ export function GetActionsList(instance: RoomOSInstanceBase<DeviceConfig>): Comp
 			},
 		],
 		callback: async (action): Promise<void> => {
-			const path = await parsePath(action.options.path)
+			const path = String(action.options.path ?? '')
 			const result = instance.subscriptions.unsubscribe('event', path)
 			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
 			if (result.ok) refreshAfterSubscriptionChange()

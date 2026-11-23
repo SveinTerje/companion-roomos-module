@@ -6,18 +6,14 @@ import { FeedbackId, GetFeedbacksList } from './feedback.js'
 import { GetPresetsList } from './presets.js'
 import { InitVariables } from './variables.js'
 import { SubscriptionManager } from './subscriptions.js'
-import {
-	CompanionVariableValues,
-	InstanceStatus,
-	SomeCompanionConfigField,
-	runEntrypoint,
-} from '@companion-module/base'
-import { UpgradeScripts } from './upgrades.js'
+import { CompanionVariableValues, InstanceStatus, SomeCompanionConfigField } from '@companion-module/base'
 
-class ControllerInstance extends RoomOSInstanceBase<DeviceConfig> {
+export { UpgradeScripts } from './upgrades.js'
+
+export default class ControllerInstance extends RoomOSInstanceBase {
 	private connected: boolean
 	private connecting: boolean
-	private timer?: NodeJS.Timer
+	private timer?: NodeJS.Timeout
 
 	private config!: DeviceConfig
 
@@ -29,8 +25,8 @@ class ControllerInstance extends RoomOSInstanceBase<DeviceConfig> {
 		this.subscriptions = new SubscriptionManager(this)
 	}
 
-	public async init(config: DeviceConfig): Promise<void> {
-		await this.configUpdated(config)
+	public async init(config: DeviceConfig, _isFirstInit: boolean, secrets: undefined): Promise<void> {
+		await this.configUpdated(config, secrets)
 		this.timer = setInterval(() => this.tick(), 5000)
 	}
 	/**
@@ -46,10 +42,6 @@ class ControllerInstance extends RoomOSInstanceBase<DeviceConfig> {
 				this.initSSH()
 			}
 		}
-	}
-	// Override base types to make types stricter
-	public checkFeedbacks(...feedbackTypes: FeedbackId[]): void {
-		super.checkFeedbacks(...feedbackTypes)
 	}
 	/**
 	 * Setup connection for SSH connection
@@ -88,7 +80,7 @@ class ControllerInstance extends RoomOSInstanceBase<DeviceConfig> {
 				this.updateStatus(InstanceStatus.Ok)
 				this.connected = true
 				if (this.xapi) this.subscriptions.attach(this.xapi)
-				this.checkFeedbacks()
+				this.checkAllFeedbacks()
 
 				this.xapi?.config
 					.get('Conference AutoAnswer')
@@ -300,13 +292,14 @@ class ControllerInstance extends RoomOSInstanceBase<DeviceConfig> {
 	 * @param {DeviceConfig} config
 	 * @memberof ControllerInstance
 	 */
-	public async configUpdated(config: DeviceConfig): Promise<void> {
+	public async configUpdated(config: DeviceConfig, _secrets: undefined): Promise<void> {
 		this.config = config
 		this.setActionDefinitions(GetActionsList(this))
 		InitVariables(this)
 		this.initSSH()
 		this.setFeedbackDefinitions(GetFeedbacksList(this))
-		this.setPresetDefinitions(GetPresetsList())
+		const { structure, presets } = GetPresetsList()
+		this.setPresetDefinitions(structure, presets)
 	}
 
 	/**
@@ -335,5 +328,3 @@ class ControllerInstance extends RoomOSInstanceBase<DeviceConfig> {
 		}
 	}
 }
-
-runEntrypoint(ControllerInstance, UpgradeScripts)

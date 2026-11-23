@@ -1,6 +1,5 @@
 import { CompanionVariableDefinition, CompanionVariableValues } from '@companion-module/base'
 import { XAPI } from 'jsxapi'
-import { DeviceConfig } from './config.js'
 import { HandleXAPIConfFeedback, HandleXAPIFeedback } from './feedback.js'
 import { RoomOSInstanceBase } from './roomos.js'
 import {
@@ -34,7 +33,7 @@ export class SubscriptionManager {
 	private customOff = new Map<string, OffFn>()
 	private eventLastCount = 0
 
-	constructor(private readonly instance: RoomOSInstanceBase<DeviceConfig>) {}
+	constructor(private readonly instance: RoomOSInstanceBase) {}
 
 	public listCustom(kind?: XapiKind): CustomSubscription[] {
 		const all = [...this.custom.values()]
@@ -50,32 +49,26 @@ export class SubscriptionManager {
 		return builtins + this.custom.size
 	}
 
-	public variableDefinitions(): CompanionVariableDefinition[] {
-		const defs: CompanionVariableDefinition[] = [
-			{ variableId: 'xfeedback_count', name: 'Number of xFeedback expressions on this connection' },
-			{ variableId: 'event_last_path', name: 'Last xEvent path' },
-			{ variableId: 'event_last_value', name: 'Last xEvent value' },
-			{ variableId: 'event_last_json', name: 'Last xEvent JSON payload' },
-			{ variableId: 'event_last_time', name: 'Last xEvent timestamp' },
-			{ variableId: 'event_last_count', name: 'Last xEvent sequence (use for Companion variable-changed triggers)' },
-		]
+	public variableDefinitions(): Record<string, CompanionVariableDefinition> {
+		const defs: Record<string, CompanionVariableDefinition> = {
+			xfeedback_count: { name: 'Number of xFeedback expressions on this connection' },
+			event_last_path: { name: 'Last xEvent path' },
+			event_last_value: { name: 'Last xEvent value' },
+			event_last_json: { name: 'Last xEvent JSON payload' },
+			event_last_time: { name: 'Last xEvent timestamp' },
+			event_last_count: { name: 'Last xEvent sequence (use for Companion variable-changed triggers)' },
+		}
 
 		for (const sub of this.custom.values()) {
 			if (sub.kind === 'status') {
-				defs.push({
-					variableId: sub.variableId,
-					name: `xStatus ${sub.path.replace(/\//g, ' ')}`,
-				})
+				defs[sub.variableId] = { name: `xStatus ${sub.path.replace(/\//g, ' ')}` }
 			} else {
-				defs.push(
-					{ variableId: sub.variableId, name: `xEvent ${sub.path.replace(/\//g, ' ')}` },
-					{ variableId: `${sub.variableId}_json`, name: `xEvent ${sub.path.replace(/\//g, ' ')} JSON` },
-					{ variableId: `${sub.variableId}_time`, name: `xEvent ${sub.path.replace(/\//g, ' ')} timestamp` },
-					{
-						variableId: `${sub.variableId}_count`,
-						name: `xEvent ${sub.path.replace(/\//g, ' ')} sequence (variable-changed trigger)`,
-					}
-				)
+				defs[sub.variableId] = { name: `xEvent ${sub.path.replace(/\//g, ' ')}` }
+				defs[`${sub.variableId}_json`] = { name: `xEvent ${sub.path.replace(/\//g, ' ')} JSON` }
+				defs[`${sub.variableId}_time`] = { name: `xEvent ${sub.path.replace(/\//g, ' ')} timestamp` }
+				defs[`${sub.variableId}_count`] = {
+					name: `xEvent ${sub.path.replace(/\//g, ' ')} sequence (variable-changed trigger)`,
+				}
 			}
 		}
 

@@ -18,6 +18,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          # Local compile uses Node 22; Companion 5.x hosts the module on Node 26.
 
       - name: Enable corepack
         run: corepack enable

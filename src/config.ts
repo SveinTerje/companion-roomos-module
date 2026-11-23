@@ -1,8 +1,8 @@
-import { Regex, SomeCompanionConfigField } from '@companion-module/base'
+import { JsonObject, Regex, SomeCompanionConfigField } from '@companion-module/base'
 
-export interface DeviceConfig {
-	host?: string
-	username?: string
+export type DeviceConfig = JsonObject & {
+	host: string
+	username: string
 	password: string
 	protocol: string
 }
@@ -23,6 +23,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			label: 'Device Host/IP',
 			width: 12,
 			regex: Regex.IP,
+			default: '',
 		},
 		{
 			type: 'textinput',
@@ -30,6 +31,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			label: 'Username',
 			width: 6,
 			regex: Regex.SOMETHING,
+			default: '',
 		},
 		{
 			type: 'textinput',

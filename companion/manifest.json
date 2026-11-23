@@ -1,12 +1,13 @@
 {
+	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
 	"id": "cisco-roomos",
 	"name": "cisco-roomos",
 	"shortname": "RoomOS",
 	"description": "See [HELP.md](./HELP.md) and [LICENSE](./LICENSE)",
 	"version": "0.0.0",
 	"license": "MIT",
-	"repository": "git+https://github.com/bitfocus/companion-module-cisco-roomos.git",
-	"bugs": "https://github.com/bitfocus/companion-module-cisco-roomos/issues",
+	"repository": "git+https://github.com/SveinTerje/companion-roomos-module.git",
+	"bugs": "https://github.com/SveinTerje/companion-roomos-module/issues",
 	"maintainers": [
 		{
 			"name": "Jeffrey Davidsz",
@@ -14,8 +15,9 @@
 		}
 	],
 	"legacyIds": ["cisco-webex-websocket", "cisco-webex"],
+	"type": "connection",
 	"runtime": {
-		"type": "node22",
+		"type": "node26",
 		"api": "nodejs-ipc",
 		"apiVersion": "0.0.0",
 		"entrypoint": "../dist/index.js"
