@@ -2,11 +2,23 @@ import { CompanionVariableDefinition, CompanionVariableValues } from '@companion
 import { XAPI } from 'jsxapi'
 import { FeedbackId, HandleXAPIFeedback } from './feedback.js'
 import { RoomOSInstanceBase } from './roomos.js'
-import { findStandardStatus, statusVariableId } from './standard-status.js'
+import {
+	MAIN_VIDEO_SOURCE_NAME_VARIABLE,
+	MAIN_VIDEO_SOURCE_PATH,
+	OSD_MODE_PATH,
+	VIDEO_INPUT_CONNECTOR_CONFIG_PATH,
+	configVariableId,
+	describeSubscriptionMapping,
+	findStandardConfig,
+	findStandardStatus,
+	statusVariableId,
+} from './standard-status.js'
 import {
 	XapiKind,
 	jsonXapiValue,
+	lookupMainVideoSourceName,
 	normalizeXapiPath,
+	parseVideoInputConnectorNames,
 	pathToVariableId,
 	stringifyXapiValue,
 	subscriptionKey,
@@ -21,6 +33,8 @@ export interface CustomSubscription {
 	path: string
 	variableId: string
 	count: number
+	autoPaired?: boolean
+	pairKey?: string
 }
 
 type OffFn = (() => void) & { registration?: Promise<unknown> }
@@ -53,6 +67,9 @@ export class SubscriptionManager {
 			if (sub.kind === 'status') {
 				if (findStandardStatus(sub.path)) continue
 				defs[sub.variableId] = { name: `xStatus ${sub.path.replace(/\//g, ' ')}` }
+			} else if (sub.kind === 'config') {
+				if (findStandardConfig(sub.path) || sub.path === VIDEO_INPUT_CONNECTOR_CONFIG_PATH) continue
+				defs[sub.variableId] = { name: `xConfiguration ${sub.path.replace(/\//g, ' ')}` }
 			} else {
 				defs[sub.variableId] = { name: `xEvent ${sub.path.replace(/\//g, ' ')}` }
 				defs[`${sub.variableId}_json`] = { name: `xEvent ${sub.path.replace(/\//g, ' ')} JSON` }
@@ -104,25 +121,40 @@ export class SubscriptionManager {
 			}
 		}
 
-		if (this.plannedExpressionCount() >= MAX_XFEEDBACK_EXPRESSIONS) {
+		const pairNeeded = kind === 'status' && path === MAIN_VIDEO_SOURCE_PATH
+		const extraSlots = pairNeeded && !this.custom.has(subscriptionKey('config', VIDEO_INPUT_CONNECTOR_CONFIG_PATH)) ? 1 : 0
+		if (this.plannedExpressionCount() + extraSlots >= MAX_XFEEDBACK_EXPRESSIONS) {
 			return {
 				ok: false,
 				message: `xFeedback limit is ${MAX_XFEEDBACK_EXPRESSIONS} expressions per connection`,
 			}
 		}
 
-		const variableId = kind === 'status' ? statusVariableId(path).variableId : pathToVariableId(kind, path)
+		const variableId =
+			kind === 'status'
+				? statusVariableId(path).variableId
+				: kind === 'config'
+					? configVariableId(path).variableId
+					: pathToVariableId(kind, path)
 		const sub: CustomSubscription = { kind, path, variableId, count: 0 }
 		this.custom.set(key, sub)
 
+		if (pairNeeded) {
+			this.ensureMainVideoSourceNamePair(sub)
+		}
+
 		if (this.xapi) {
 			this.activateCustom(this.xapi, sub)
+			if (sub.pairKey) {
+				const pair = this.custom.get(sub.pairKey)
+				if (pair) this.activateCustom(this.xapi, pair)
+			}
 		}
 
 		this.publishCount()
 		return {
 			ok: true,
-			message: `Subscribed ${kind} ${path} -> ${this.variableHint(sub)}`,
+			message: `Subscribed ${kind} ${path} -> ${describeSubscriptionMapping(kind, path, variableId)}`,
 			variableId,
 		}
 	}
@@ -137,11 +169,7 @@ export class SubscriptionManager {
 		if (!sub) {
 			return { ok: false, message: `No ${kind} subscription for ${path}` }
 		}
-		this.deactivateCustom(key)
-		this.custom.delete(key)
-		if (sub.kind === 'status') {
-			this.instance.setVariableValues({ [sub.variableId]: '' })
-		}
+		this.removeSubscription(key, sub)
 		this.publishCount()
 		return { ok: true, message: `Unsubscribed ${kind} ${path}` }
 	}
@@ -150,13 +178,58 @@ export class SubscriptionManager {
 		const n = this.custom.size
 		const cleared: CompanionVariableValues = {}
 		for (const [key, sub] of [...this.custom.entries()]) {
+			this.clearSubscriptionValues(cleared, sub)
 			this.deactivateCustom(key)
 			this.custom.delete(key)
-			if (sub.kind === 'status') cleared[sub.variableId] = ''
 		}
 		if (Object.keys(cleared).length) this.instance.setVariableValues(cleared)
 		this.publishCount()
 		return { ok: true, message: `Removed ${n} subscription(s)` }
+	}
+
+	private ensureMainVideoSourceNamePair(main: CustomSubscription): void {
+		const pairKey = subscriptionKey('config', VIDEO_INPUT_CONNECTOR_CONFIG_PATH)
+		const existing = this.custom.get(pairKey)
+		if (existing) {
+			main.pairKey = pairKey
+			return
+		}
+		const pair: CustomSubscription = {
+			kind: 'config',
+			path: VIDEO_INPUT_CONNECTOR_CONFIG_PATH,
+			variableId: '',
+			count: 0,
+			autoPaired: true,
+		}
+		this.custom.set(pairKey, pair)
+		main.pairKey = pairKey
+	}
+
+	private removeSubscription(key: string, sub: CustomSubscription): void {
+		const cleared: CompanionVariableValues = {}
+		this.clearSubscriptionValues(cleared, sub)
+		this.deactivateCustom(key)
+		this.custom.delete(key)
+		if (sub.pairKey) {
+			const pair = this.custom.get(sub.pairKey)
+			if (pair?.autoPaired) {
+				this.deactivateCustom(sub.pairKey)
+				this.custom.delete(sub.pairKey)
+			}
+		}
+		if (Object.keys(cleared).length) this.instance.setVariableValues(cleared)
+	}
+
+	private clearSubscriptionValues(cleared: CompanionVariableValues, sub: CustomSubscription): void {
+		if (sub.kind === 'event' || !sub.variableId) return
+		cleared[sub.variableId] = ''
+		if (sub.path === MAIN_VIDEO_SOURCE_PATH) {
+			cleared[MAIN_VIDEO_SOURCE_NAME_VARIABLE] = ''
+			this.instance.mainVideoSource = ''
+		}
+		if (sub.path === OSD_MODE_PATH) this.instance.osdMode = ''
+		if (sub.path === 'Audio/Volume') this.instance.volumeLevel = undefined
+		if (sub.path === VIDEO_INPUT_CONNECTOR_CONFIG_PATH) this.instance.videoInputConnectorNames = {}
 	}
 
 	private activateCustom(xapi: XAPI, sub: CustomSubscription): void {
@@ -171,6 +244,17 @@ export class SubscriptionManager {
 			this.customOff.set(key, off)
 			off.registration?.catch((e: unknown) => {
 				this.instance.log('warn', `xStatus subscribe ${sub.path} failed: ${formatXapiError(e)}`)
+			})
+			return
+		}
+
+		if (sub.kind === 'config') {
+			const off = xapi.config.on(sub.path, (value: unknown) => {
+				this.syncConfigState(sub, value)
+			}) as OffFn
+			this.customOff.set(key, off)
+			off.registration?.catch((e: unknown) => {
+				this.instance.log('warn', `xConfiguration subscribe ${sub.path} failed: ${formatXapiError(e)}`)
 			})
 			return
 		}
@@ -213,11 +297,6 @@ export class SubscriptionManager {
 		this.instance.setVariableValues({ xfeedback_count: String(this.liveExpressionCount()) })
 	}
 
-	private variableHint(sub: CustomSubscription): string {
-		if (sub.kind === 'status') return `variable ${sub.variableId}`
-		return `variables ${sub.variableId} / ${sub.variableId}_count (trigger on _count)`
-	}
-
 	private formatStatusValue(sub: CustomSubscription, value: unknown): string {
 		if (sub.variableId === 'audio_connector_mute') {
 			return formatMicrophoneConnectors(value)
@@ -225,7 +304,45 @@ export class SubscriptionManager {
 		return stringifyXapiValue(value)
 	}
 
+	private syncConfigState(sub: CustomSubscription, value: unknown): void {
+		if (sub.path === VIDEO_INPUT_CONNECTOR_CONFIG_PATH) {
+			const parsed = parseVideoInputConnectorNames(value)
+			if (Object.keys(parsed).length) {
+				if (Array.isArray(value)) {
+					this.instance.videoInputConnectorNames = parsed
+				} else {
+					this.instance.videoInputConnectorNames = {
+						...this.instance.videoInputConnectorNames,
+						...parsed,
+					}
+				}
+				this.publishMainVideoSourceName()
+			}
+			return
+		}
+
+		const text = stringifyXapiValue(value)
+		if (sub.variableId) {
+			this.instance.setVariableValues({ [sub.variableId]: text })
+		}
+		if (sub.path === OSD_MODE_PATH) {
+			this.instance.osdMode = text
+		}
+	}
+
 	private syncCompanionState(path: string, value: unknown): void {
+		if (path === MAIN_VIDEO_SOURCE_PATH) {
+			this.instance.mainVideoSource = stringifyXapiValue(value)
+			this.publishMainVideoSourceName()
+			void this.fetchConnectorNameIfMissing()
+			return
+		}
+		if (path === 'Audio/Volume') {
+			const n = Number.parseInt(stringifyXapiValue(value), 10)
+			this.instance.volumeLevel = Number.isFinite(n) ? n : undefined
+			this.instance.setVariableValues({ volume: stringifyXapiValue(value) })
+			return
+		}
 		if (path === 'Call' || path.startsWith('Call/')) {
 			HandleXAPIFeedback(this.instance, { Call: this.normalizeCallPayload(value) })
 			return
@@ -245,6 +362,30 @@ export class SubscriptionManager {
 		}
 		if (path === 'Time' || path.startsWith('Time/')) {
 			HandleXAPIFeedback(this.instance, nestStatus('Time', path, value))
+		}
+	}
+
+	private publishMainVideoSourceName(): void {
+		const id = this.instance.mainVideoSource
+		this.instance.setVariableValues({
+			MainVideoSource: id,
+			[MAIN_VIDEO_SOURCE_NAME_VARIABLE]: lookupMainVideoSourceName(id, this.instance.videoInputConnectorNames),
+		})
+	}
+
+	private async fetchConnectorNameIfMissing(): Promise<void> {
+		const id = this.instance.mainVideoSource
+		if (!id || id === 'Composed') return
+		if (this.instance.videoInputConnectorNames[id]) return
+		if (!this.xapi) return
+		try {
+			const name = await this.xapi.config.get(`Video Input Connector ${id} Name`)
+			if (name != null && String(name) !== '') {
+				this.instance.videoInputConnectorNames[id] = String(name)
+				this.publishMainVideoSourceName()
+			}
+		} catch (e: unknown) {
+			this.instance.log('warn', `RoomOS: Video Input Connector ${id} Name: ${formatXapiError(e)}`)
 		}
 	}
 

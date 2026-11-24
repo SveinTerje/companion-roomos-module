@@ -1,6 +1,14 @@
 import { RoomOSInstanceBase } from './roomos.js'
-import { STANDARD_STATUS_SUBSCRIPTIONS } from './standard-status.js'
+import {
+	OSD_MODE_PATH,
+	STANDARD_CONFIG_SUBSCRIPTIONS,
+	STANDARD_STATUS_SUBSCRIPTIONS,
+	SUBSCRIPTION_MAPPING_DESCRIPTION,
+	findStandardConfig,
+} from './standard-status.js'
 import { SetVariableDefinitions } from './variables.js'
+import { XapiKind, stringifyXapiValue } from './xapi-path.js'
+import { formatXapiError } from './xapi-rpc.js'
 import {
 	CompanionActionDefinitions,
 	CompanionInputFieldDropdown,
@@ -23,6 +31,8 @@ export enum ActionId {
 	AutoAnswerMute = 'autoanswer_mute',
 	AutoAnswerDelay = 'autoanswer_delay',
 	Volume = 'volume',
+	VolumeIncrease = 'volume_increase',
+	VolumeDecrease = 'volume_decrease',
 	MicrophoneMute = 'microphones_mute',
 	MicrophoneInput = 'microphone_input',
 	MusicMode = 'microphones_music_mode',
@@ -42,6 +52,7 @@ export enum ActionId {
 	OSDKeyClick = 'OSD_key_click',
 	OSDKeyPress = 'OSD_key_press',
 	OSDKeyRelease = 'OSD_key_release',
+	OsdMode = 'osd_mode',
 	CameraBackground = 'camera_background',
 	VideoMonitors = 'video_monitors',
 	VideoOutputMonitorRole = 'video_output_monitor_role',
@@ -145,13 +156,54 @@ function SourceIdNumber(): CompanionInputFieldNumber {
 
 function customSubscriptionChoices(
 	instance: RoomOSInstanceBase,
-	kind: 'status' | 'event'
+	kind: 'status' | 'event' | 'value'
 ): { id: string; label: string }[] {
-	const list = instance.subscriptions?.listCustom(kind) ?? []
+	const list =
+		kind === 'value'
+			? [...(instance.subscriptions?.listCustom('status') ?? []), ...(instance.subscriptions?.listCustom('config') ?? [])]
+			: (instance.subscriptions?.listCustom(kind) ?? [])
 	if (list.length === 0) {
-		return [{ id: '', label: `No activated x${kind === 'status' ? 'Status' : 'Event'} subscriptions` }]
+		const empty =
+			kind === 'event' ? 'No activated xEvent subscriptions' : 'No activated xStatus/xConfiguration subscriptions'
+		return [{ id: '', label: empty }]
 	}
-	return list.map((s) => ({ id: s.path, label: `${s.path.replace(/\//g, ' ')} (${s.variableId})` }))
+	return list.map((s) => ({
+		id: `${s.kind}:${s.path}`,
+		label: `${s.path.replace(/\//g, ' ')} (${s.variableId || 'internal mapping'}${s.kind === 'config' ? ', xConfiguration' : ''})`,
+	}))
+}
+
+function parseSubscriptionChoice(raw: string, fallback: XapiKind): { kind: XapiKind; path: string } {
+	const colon = raw.indexOf(':')
+	if (colon > 0) {
+		const kind = raw.slice(0, colon)
+		if (kind === 'status' || kind === 'event' || kind === 'config') {
+			return { kind, path: raw.slice(colon + 1) }
+		}
+	}
+	return { kind: fallback, path: raw }
+}
+
+async function bumpVolume(instance: RoomOSInstanceBase, delta: number): Promise<void> {
+	const amount = Number.isFinite(delta) ? delta : 0
+	if (!amount) return
+
+	let current = instance.volumeLevel
+	if (current == null) {
+		try {
+			const got = await instance.xapi?.Status.Audio.Volume.get()
+			const n = Number.parseInt(stringifyXapiValue(got), 10)
+			if (Number.isFinite(n)) current = n
+		} catch (e: unknown) {
+			instance.log('warn', `RoomOS: read Audio Volume failed: ${formatXapiError(e)}`)
+		}
+	}
+	if (current == null) current = amount > 0 ? 0 : 100
+
+	const next = Math.max(0, Math.min(100, current + amount))
+	await instance.xapi?.Command.Audio.Volume.Set({ Level: next })
+	instance.volumeLevel = next
+	instance.setVariableValues({ volume: String(next) })
 }
 
 export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDefinitions {
@@ -164,6 +216,7 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 
 	actions[ActionId.SubscribeStatus] = {
 		name: 'xStatus: Subscribe',
+		description: SUBSCRIPTION_MAPPING_DESCRIPTION,
 		options: [
 			{
 				type: 'dropdown',
@@ -173,7 +226,11 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 				choices: [
 					...STANDARD_STATUS_SUBSCRIPTIONS.map((s) => ({
 						id: s.path,
-						label: `${s.name} (${s.variableId})`,
+						label: `${s.name} → $(${s.variableId})`,
+					})),
+					...STANDARD_CONFIG_SUBSCRIPTIONS.map((s) => ({
+						id: s.path,
+						label: `${s.name} → $(${s.variableId}) [xConfiguration]`,
 					})),
 					{ id: 'custom', label: 'Custom path…' },
 				],
@@ -189,7 +246,8 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 		callback: async (action): Promise<void> => {
 			const standard = String(action.options.standard ?? '')
 			const path = standard && standard !== 'custom' ? standard : String(action.options.path ?? '')
-			const result = instance.subscriptions.subscribe('status', path)
+			const kind: XapiKind = findStandardConfig(path) ? 'config' : 'status'
+			const result = instance.subscriptions.subscribe(kind, path)
 			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
 			if (result.ok) refreshAfterSubscriptionChange()
 		},
@@ -201,19 +259,20 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 				type: 'dropdown',
 				label: 'Subscription',
 				id: 'path',
-				default: customSubscriptionChoices(instance, 'status')[0]?.id ?? '',
-				choices: customSubscriptionChoices(instance, 'status'),
+				default: customSubscriptionChoices(instance, 'value')[0]?.id ?? '',
+				choices: customSubscriptionChoices(instance, 'value'),
 			},
 		],
 		callback: async (action): Promise<void> => {
-			const path = String(action.options.path ?? '')
-			const result = instance.subscriptions.unsubscribe('status', path)
+			const choice = parseSubscriptionChoice(String(action.options.path ?? ''), 'status')
+			const result = instance.subscriptions.unsubscribe(choice.kind, choice.path)
 			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
 			if (result.ok) refreshAfterSubscriptionChange()
 		},
 	}
 	actions[ActionId.SubscribeEvent] = {
 		name: 'xEvent: Subscribe',
+		description: SUBSCRIPTION_MAPPING_DESCRIPTION,
 		options: [
 			{
 				type: 'textinput',
@@ -243,8 +302,8 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 			},
 		],
 		callback: async (action): Promise<void> => {
-			const path = String(action.options.path ?? '')
-			const result = instance.subscriptions.unsubscribe('event', path)
+			const choice = parseSubscriptionChoice(String(action.options.path ?? ''), 'event')
+			const result = instance.subscriptions.unsubscribe(choice.kind, choice.path)
 			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
 			if (result.ok) refreshAfterSubscriptionChange()
 		},
@@ -411,13 +470,63 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 			await instance.xapi?.Command.Audio.Volume.Set({ Level: volume })
 		},
 	}
+	actions[ActionId.VolumeIncrease] = {
+		name: 'Audio: Volume up',
+		description: 'Increase xStatus Audio Volume by the given amount (0-100 scale). Default +5.',
+		options: [
+			{
+				type: 'number',
+				default: 5,
+				label: 'Increase by (0-100 scale)',
+				min: 1,
+				max: 50,
+				id: 'amount',
+			},
+		],
+		callback: async (action): Promise<void> => {
+			await bumpVolume(instance, parseInt(String(action.options.amount ?? 5), 10))
+		},
+	}
+	actions[ActionId.VolumeDecrease] = {
+		name: 'Audio: Volume down',
+		description: 'Decrease xStatus Audio Volume by the given amount (0-100 scale). Default -5.',
+		options: [
+			{
+				type: 'number',
+				default: 5,
+				label: 'Decrease by (0-100 scale)',
+				min: 1,
+				max: 50,
+				id: 'amount',
+			},
+		],
+		callback: async (action): Promise<void> => {
+			await bumpVolume(instance, -parseInt(String(action.options.amount ?? 5), 10))
+		},
+	}
 	actions[ActionId.MicrophoneMute] = {
 		name: 'Audio: Microphones Mute',
-		options: [RoomOSOnOffBooleanDropdown('Mute', 'Mute')],
+		options: [
+			{
+				id: 'Mute',
+				label: 'Mute',
+				type: 'dropdown',
+				default: 'Off',
+				choices: [
+					{ label: 'On', id: 'On' },
+					{ label: 'Off', id: 'Off' },
+					{ label: 'Toggle', id: 'Toggle' },
+				],
+			},
+		],
 		callback: async (action): Promise<void> => {
 			const opt = action.options
+			let muteOn = opt.Mute == 'On'
+			if (opt.Mute == 'Toggle') {
+				muteOn = !instance.microphoneMute
+			}
 
-			if (opt.Mute == 'On') {
+			if (muteOn) {
 				await instance.xapi?.Command.Audio.Microphones.Mute()
 			} else {
 				await instance.xapi?.Command.Audio.Microphones.Unmute()
@@ -495,7 +604,7 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 					{ id: '5', label: '5' },
 					{ id: '6', label: '6' },
 				],
-				default: 'new',
+				default: 'New',
 			},
 			{
 				label: 'Layout',
@@ -527,6 +636,16 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 		callback: async (action): Promise<void> => {
 			const opt = action.options
 
+			if (String(opt.StartStop) === 'Stop') {
+				const instanceId = String(opt.Instance)
+				if (instanceId && instanceId !== 'New') {
+					await instance.xapi?.Command.Presentation.Stop({ Instance: parseInt(instanceId, 10) })
+				} else {
+					await instance.xapi?.Command.Presentation.Stop()
+				}
+				return
+			}
+
 			const connectorId = parseInt(String(opt.ConnectorId))
 			const instances = String(opt.Instance) == 'New' ? String(opt.Instance) : parseInt(String(opt.Instance))
 			const presentationSource =
@@ -534,7 +653,7 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 					? String(opt.PresentationSource)
 					: parseInt(String(opt.PresentationSource))
 
-			await instance.xapi?.Command.Presentation.start({
+			await instance.xapi?.Command.Presentation.Start({
 				ConnectorId: connectorId,
 				Instance: instances,
 				Layout: opt.Layout,
@@ -984,6 +1103,45 @@ export function GetActionsList(instance: RoomOSInstanceBase): CompanionActionDef
 				PIPPosition: opt.PIPPosition,
 				OnMonitorRole: opt.OnMonitorRole,
 			})
+		},
+	}
+	actions[ActionId.OsdMode] = {
+		name: 'UserInterface: OSD Mode',
+		description:
+			'Toggle or set xConfiguration UserInterface OSD Mode (Auto / Unobstructed). Activates the osd_mode variable.',
+		options: [
+			{
+				id: 'Mode',
+				label: 'Mode',
+				type: 'dropdown',
+				default: 'Toggle',
+				choices: [
+					{ id: 'Toggle', label: 'Toggle Auto / Unobstructed' },
+					{ id: 'Auto', label: 'Auto' },
+					{ id: 'Unobstructed', label: 'Unobstructed' },
+				],
+			},
+		],
+		callback: async (action): Promise<void> => {
+			const result = instance.subscriptions.subscribe('config', OSD_MODE_PATH)
+			instance.log(result.ok ? 'info' : 'warn', `RoomOS: ${result.message}`)
+			if (result.ok) refreshAfterSubscriptionChange()
+
+			let mode = String(action.options.Mode ?? 'Toggle')
+			if (mode === 'Toggle') {
+				let current = instance.osdMode
+				if (!current) {
+					try {
+						current = stringifyXapiValue(await instance.xapi?.Config.UserInterface.OSD.Mode.get())
+					} catch (e: unknown) {
+						instance.log('warn', `RoomOS: read OSD Mode failed: ${formatXapiError(e)}`)
+					}
+				}
+				mode = current === 'Unobstructed' ? 'Auto' : 'Unobstructed'
+			}
+			await instance.xapi?.Config.UserInterface.OSD.Mode.set(mode)
+			instance.osdMode = mode
+			instance.setVariableValues({ osd_mode: mode })
 		},
 	}
 	actions[ActionId.OSDKeyClick] = {

@@ -1,7 +1,48 @@
-import { CompanionPresetDefinitions, CompanionPresetSection, combineRgb } from '@companion-module/base'
+import {
+	CompanionPresetDefinitions,
+	CompanionPresetSection,
+	CompanionSimplePresetDefinition,
+	CompanionTextSize,
+	SomePresetActionEntry,
+	SomePresetSimpleFeedbackEntry,
+	combineRgb,
+} from '@companion-module/base'
 import { ActionId } from './actions.js'
 import { FeedbackId } from './feedback.js'
 import type { RoomOSTypes } from './roomos.js'
+
+const WHITE = combineRgb(255, 255, 255)
+const BLACK = combineRgb(0, 0, 0)
+const GREEN = combineRgb(0, 80, 0)
+
+function button(
+	name: string,
+	text: string,
+	down: SomePresetActionEntry<RoomOSTypes>[] = [],
+	extra?: {
+		size?: CompanionTextSize
+		bgcolor?: number
+		feedbacks?: SomePresetSimpleFeedbackEntry<RoomOSTypes>[]
+	}
+): CompanionSimplePresetDefinition<RoomOSTypes> {
+	return {
+		type: 'simple',
+		name,
+		style: {
+			text,
+			size: extra?.size ?? '14',
+			color: WHITE,
+			bgcolor: extra?.bgcolor ?? BLACK,
+		},
+		feedbacks: extra?.feedbacks ?? [],
+		steps: [
+			{
+				down,
+				up: [],
+			},
+		],
+	}
+}
 
 export function GetPresetsList(): {
 	structure: CompanionPresetSection<RoomOSTypes>[]
@@ -9,491 +50,242 @@ export function GetPresetsList(): {
 } {
 	const presets: CompanionPresetDefinitions<RoomOSTypes> = {}
 
-	presets['general_dial'] = {
-		type: 'simple',
-		
-		name: `Dial`,
-		style: {
-			text: `Dial`,
+	presets['general_dial'] = button(
+		'Dial',
+		'Dial',
+		[{ actionId: ActionId.Dial, options: { number: '' } }],
+		{
 			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [
+			feedbacks: [
+				{
+					feedbackId: FeedbackId.HasOutgoingCall,
+					options: { bg: combineRgb(0, 255, 0), fg: BLACK },
+				},
+			],
+		}
+	)
+	presets['general_accept_all_calls'] = button(
+		'Accept all calls',
+		'Accept call',
+		[{ actionId: ActionId.Accept, options: {} }],
+		{ size: '18' }
+	)
+	presets['general_disconnect'] = button(
+		'Disconnect',
+		'Disconnect',
+		[{ actionId: ActionId.Disconnect, options: { CallId: 0 } }],
+		{ size: '18' }
+	)
+	presets['general_dnd_on'] = button(
+		'Do Not Disturb on',
+		'DND\\nOn',
+		[{ actionId: ActionId.ConferenceDoNotDisturbActivate, options: { Timeout: 60 } }]
+	)
+	presets['general_dnd_off'] = button(
+		'Do Not Disturb off',
+		'DND\\nOff',
+		[{ actionId: ActionId.ConferenceDoNotDisturbDeActivate, options: {} }]
+	)
+
+	presets['audio_volume'] = button('Show audio volume', 'Vol\\n$(volume)')
+	presets['audio_volume_up'] = button(
+		'Volume up',
+		'Vol\\n+',
+		[{ actionId: ActionId.VolumeIncrease, options: { amount: 5 } }],
+		{ bgcolor: GREEN }
+	)
+	presets['audio_volume_down'] = button(
+		'Volume down',
+		'Vol\\n-',
+		[{ actionId: ActionId.VolumeDecrease, options: { amount: 5 } }],
+		{ bgcolor: GREEN }
+	)
+	presets['audio_mic_mute'] = button(
+		'Microphone mute',
+		'Mic\\nMute',
+		[{ actionId: ActionId.MicrophoneMute, options: { Mute: 'On' } }],
+		{
+			feedbacks: [
+				{
+					feedbackId: FeedbackId.MicrophoneMute,
+					options: { bg: combineRgb(255, 0, 0), fg: WHITE },
+				},
+			],
+		}
+	)
+	presets['audio_mic_unmute'] = button(
+		'Microphone unmute',
+		'Mic\\nUnmute',
+		[{ actionId: ActionId.MicrophoneMute, options: { Mute: 'Off' } }],
+		{
+			feedbacks: [
+				{
+					feedbackId: FeedbackId.MicrophoneMute,
+					options: { bg: combineRgb(255, 0, 0), fg: WHITE },
+				},
+			],
+		}
+	)
+	presets['audio_mic_mute_toggle'] = button(
+		'Microphone mute toggle',
+		'Mic\\nToggle',
+		[{ actionId: ActionId.MicrophoneMute, options: { Mute: 'Toggle' } }],
+		{
+			feedbacks: [
+				{
+					feedbackId: FeedbackId.MicrophoneMute,
+					options: { bg: combineRgb(255, 0, 0), fg: WHITE },
+				},
+			],
+		}
+	)
+
+	presets['visual_software_version'] = button('Show software version', 'SW\\n$(SystemUnit_Software_Version)')
+	presets['visual_active_calls'] = button('Show number of active calls', 'Calls\\n$(number_of_active_calls)')
+	presets['visual_main_video_source'] = button('Show main video source', 'Main\\n$(main_video_source_name)')
+
+	presets['video_presentation_start'] = button(
+		'Presentation start',
+		'Pres\\nStart',
+		[
 			{
-				feedbackId: FeedbackId.HasOutgoingCall,
+				actionId: ActionId.Presentation,
 				options: {
-					bg: combineRgb(0, 255, 0),
-					fg: combineRgb(0, 0, 0),
+					StartStop: 'Start',
+					ConnectorId: 1,
+					Instance: 'New',
+					Layout: 'Equal',
+					PresentationSource: '1',
+					SendingMode: 'LocalRemote',
 				},
 			},
-		],
-		steps: [
+		]
+	)
+	presets['video_presentation_stop'] = button(
+		'Presentation stop',
+		'Pres\\nStop',
+		[{ actionId: ActionId.Presentation, options: { StartStop: 'Stop', Instance: 'New' } }]
+	)
+	presets['video_selfview_on'] = button(
+		'Self-view on',
+		'Selfview\\nOn',
+		[
 			{
-				down: [
-					{
-						actionId: ActionId.Dial,
-						options: {
-							number: '',
-						},
-					},
-				],
-				up: [],
+				actionId: ActionId.SelfView,
+				options: { Mode: 'On', FullscreenMode: 'Off', PIPPosition: 'LowerRight', OnMonitorRole: 'First' },
+			},
+		]
+	)
+	presets['video_selfview_off'] = button(
+		'Self-view off',
+		'Selfview\\nOff',
+		[
+			{
+				actionId: ActionId.SelfView,
+				options: { Mode: 'Off', FullscreenMode: 'Off', PIPPosition: 'LowerRight', OnMonitorRole: 'First' },
+			},
+		]
+	)
+	presets['video_camera_preset'] = button(
+		'Camera preset',
+		'Cam\\nPreset 1',
+		[{ actionId: ActionId.CameraPreset, options: { PresetId: 1 } }]
+	)
+
+	presets['subscribe_xstatus'] = button(
+		'Subscribe xStatus',
+		'Sub\\nxStatus',
+		[{ actionId: ActionId.SubscribeStatus, options: { standard: 'SystemUnit/Software/Version', path: '' } }],
+		{ bgcolor: GREEN }
+	)
+	presets['subscribe_volume'] = button(
+		'Subscribe audio volume',
+		'Sub\\nVolume',
+		[{ actionId: ActionId.SubscribeStatus, options: { standard: 'Audio/Volume', path: '' } }],
+		{ bgcolor: GREEN }
+	)
+	presets['subscribe_main_video_source'] = button(
+		'Subscribe main video source',
+		'Sub\\nMain src',
+		[{ actionId: ActionId.SubscribeStatus, options: { standard: 'Video/Input/MainVideoSource', path: '' } }],
+		{ bgcolor: GREEN }
+	)
+	presets['subscribe_xevent'] = button(
+		'Subscribe xEvent',
+		'Sub\\nxEvent',
+		[{ actionId: ActionId.SubscribeEvent, options: { path: 'CallDisconnect' } }],
+		{ bgcolor: GREEN }
+	)
+
+	presets['custom-xconfig'] = button(
+		'Custom xConfiguration',
+		'custom\\nxConfiguration',
+		[{ actionId: ActionId.CustomConfiguration, options: { path: 'Conference AutoAnswer Mode', Value: 'On' } }],
+		{ size: '18' }
+	)
+	presets['custom_xcommand'] = button(
+		'Custom xCommand',
+		'custom\\nxCommand',
+		[
+			{
+				actionId: ActionId.CustomCommand,
+				options: { Method: 'Dial', Params: '{"Number":"123456789@meet24.webex.com"}' },
 			},
 		],
-	}
-	presets['audio_volume'] = {
-		type: 'simple',
-		
-		name: `Audio volume`,
-		style: {
-			text: `Audio volume`,
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.Volume,
-						options: {
-							volume: 80,
-						},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['audio_mic_mute'] = {
-		type: 'simple',
-		
-		name: `Microphone mute`,
-		style: {
-			text: `Microphone mute`,
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [
-			{
-				feedbackId: FeedbackId.MicrophoneMute,
-				options: {
-					bg: combineRgb(255, 0, 0),
-					fg: combineRgb(255, 255, 255),
-				},
-			},
-		],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.MicrophoneMute,
-						options: {
-							Mute: 'On',
-						},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['general_accept_all_calls'] = {
-		type: 'simple',
-		
-		name: `Accept all calls`,
-		style: {
-			text: `Accept call`,
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.Accept,
-						options: {},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['general_disconnect'] = {
-		type: 'simple',
-		
-		name: `Disconnect`,
-		style: {
-			text: `Disconnect`,
-			size: '7',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.Disconnect,
-						options: {
-							CallId: 0,
-						},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['general_auto_answer'] = {
-		type: 'simple',
-		
-		name: `Auto-answer mode`,
-		style: {
-			text: `Auto\\nanswer`,
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [
-			{
-				feedbackId: FeedbackId.AutoAnswer,
-				options: {
-					bg: combineRgb(255, 255, 255),
-					fg: combineRgb(0, 0, 0),
-				},
-			},
-		],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.AutoAnswerMode,
-						options: {
-							Mode: 'On',
-						},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['visual_show_ingoing_calls'] = {
-		type: 'simple',
-		
-		name: `Show active ingoing calls`,
-		style: {
-			text: `Ingoing\\ncall`,
-			size: '14',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [
-			{
-				feedbackId: FeedbackId.HasIngoingCall,
-				options: {
-					bg: combineRgb(0, 255, 0),
-					fg: combineRgb(0, 0, 0),
-				},
-			},
-		],
-		steps: [
-			{
-				down: [],
-				up: [],
-			},
-		],
-	}
-	presets['visual_show_outgoing_calls'] = {
-		type: 'simple',
-		
-		name: `Show active outgoing calls`,
-		style: {
-			text: `Outgoing\\ncall`,
-			size: '14',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [
-			{
-				feedbackId: FeedbackId.HasOutgoingCall,
-				options: {
-					bg: combineRgb(0, 255, 0),
-					fg: combineRgb(0, 0, 0),
-				},
-			},
-		],
-		steps: [
-			{
-				down: [],
-				up: [],
-			},
-		],
-	}
-	presets['visual_show_ingoing_ringing_calls'] = {
-		type: 'simple',
-		
-		name: `Show ingoing ringing calls`,
-		style: {
-			text: `Ringing`,
-			size: '14',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [
-			{
-				feedbackId: FeedbackId.Ringing,
-				options: {
-					bg: combineRgb(0, 255, 0),
-					fg: combineRgb(0, 0, 0),
-				},
-			},
-		],
-		steps: [
-			{
-				down: [],
-				up: [],
-			},
-		],
-	}
-	presets['visual_software_version'] = {
-		type: 'simple',
-		
-		name: 'Show software version',
-		style: {
-			text: 'SW\\n$(SystemUnit_Software_Version)',
-			size: '14',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [],
-				up: [],
-			},
-		],
-	}
-	presets['visual_active_calls'] = {
-		type: 'simple',
-		
-		name: 'Show number of active calls',
-		style: {
-			text: 'Calls\\n$(number_of_active_calls)',
-			size: '14',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [],
-				up: [],
-			},
-		],
-	}
-	presets['subscribe_xstatus'] = {
-		type: 'simple',
-		
-		name: 'Subscribe xStatus',
-		style: {
-			text: 'Sub\\nxStatus',
-			size: '14',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 80, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.SubscribeStatus,
-						options: {
-							standard: 'SystemUnit/Software/Version',
-							path: '',
-						},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['subscribe_xevent'] = {
-		type: 'simple',
-		
-		name: 'Subscribe xEvent',
-		style: {
-			text: 'Sub\\nxEvent',
-			size: '14',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 80, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.SubscribeEvent,
-						options: {
-							path: 'CallDisconnect',
-						},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['custom-xconfig'] = {
-		type: 'simple',
-		
-		name: `Custom xConfiguration`,
-		style: {
-			text: 'custom\\nxConfiguration',
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.CustomConfiguration,
-						options: {
-							path: 'Conference AutoAnswer Mode',
-							Value: 'On',
-						},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['custom_xcommand'] = {
-		type: 'simple',
-		
-		name: `Custom xCommand`,
-		style: {
-			text: 'custom\\nxCommand',
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.CustomCommand,
-						options: {
-							Method: 'Dial',
-							Params: '{"Number":"123456789@meet24.webex.com"}',
-						},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['osd_key_click'] = {
-		type: 'simple',
-		
-		name: `OSD Key Click`,
-		style: {
-			text: 'OSD Click',
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.OSDKeyClick,
-						options: {},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['osd_key_press'] = {
-		type: 'simple',
-		
-		name: `OSD Key Press`,
-		style: {
-			text: 'OSD Press',
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.OSDKeyPress,
-						options: {},
-					},
-				],
-				up: [],
-			},
-		],
-	}
-	presets['osd_key_release'] = {
-		type: 'simple',
-		
-		name: `OSD Key Release`,
-		style: {
-			text: 'OSD Release',
-			size: '18',
-			color: combineRgb(255, 255, 255),
-			bgcolor: combineRgb(0, 0, 0),
-		},
-		feedbacks: [],
-		steps: [
-			{
-				down: [
-					{
-						actionId: ActionId.OSDKeyRelease,
-						options: {},
-					},
-				],
-				up: [],
-			},
-		],
-	}
+		{ size: '18' }
+	)
+
+	presets['osd_mode'] = button(
+		'OSD Mode',
+		'OSD Mode:\\n$(osd_mode)',
+		[{ actionId: ActionId.OsdMode, options: { Mode: 'Toggle' } }],
+		{ bgcolor: combineRgb(0, 60, 80) }
+	)
 
 	const structure: CompanionPresetSection[] = [
 		{
 			id: 'general',
 			name: 'General functions',
-			definitions: ['general_dial', 'general_accept_all_calls', 'general_disconnect', 'general_auto_answer'],
+			definitions: [
+				'general_dial',
+				'general_accept_all_calls',
+				'general_disconnect',
+				'general_dnd_on',
+				'general_dnd_off',
+			],
 		},
 		{
 			id: 'audio',
 			name: 'Audio',
-			definitions: ['audio_volume', 'audio_mic_mute'],
+			definitions: [
+				'audio_volume',
+				'audio_volume_up',
+				'audio_volume_down',
+				'audio_mic_mute',
+				'audio_mic_unmute',
+				'audio_mic_mute_toggle',
+			],
 		},
 		{
 			id: 'visual',
 			name: 'Visual buttons',
+			definitions: ['visual_software_version', 'visual_active_calls', 'visual_main_video_source'],
+		},
+		{
+			id: 'video',
+			name: 'Video',
 			definitions: [
-				'visual_show_ingoing_calls',
-				'visual_show_outgoing_calls',
-				'visual_show_ingoing_ringing_calls',
-				'visual_software_version',
-				'visual_active_calls',
+				'video_presentation_start',
+				'video_presentation_stop',
+				'video_selfview_on',
+				'video_selfview_off',
+				'video_camera_preset',
 			],
 		},
 		{
 			id: 'xapi',
 			name: 'xAPI subscriptions',
-			definitions: ['subscribe_xstatus', 'subscribe_xevent'],
+			definitions: ['subscribe_xstatus', 'subscribe_volume', 'subscribe_main_video_source', 'subscribe_xevent'],
 		},
 		{
 			id: 'custom',
@@ -503,7 +295,7 @@ export function GetPresetsList(): {
 		{
 			id: 'osd',
 			name: 'OSD',
-			definitions: ['osd_key_click', 'osd_key_press', 'osd_key_release'],
+			definitions: ['osd_mode'],
 		},
 	]
 
