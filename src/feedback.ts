@@ -94,6 +94,11 @@ export function HandleXAPIFeedback(instance: RoomOSInstanceBase, event: any): vo
 			instance.microphoneMute = event.Audio.Microphones.Mute == 'On' ? true : false
 			checkFeedbacks.push(FeedbackId.MicrophoneMute)
 		}
+		if (event.Audio.Volume != undefined && typeof event.Audio.Volume !== 'object') {
+			newValues['volume'] = stringifyXapiValue(event.Audio.Volume)
+			const n = Number.parseInt(stringifyXapiValue(event.Audio.Volume), 10)
+			instance.volumeLevel = Number.isFinite(n) ? n : instance.volumeLevel
+		}
 	}
 
 	if (event.Call) {

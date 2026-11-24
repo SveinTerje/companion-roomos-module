@@ -64,6 +64,10 @@ export abstract class RoomOSInstanceBase extends InstanceBase<RoomOSTypes> {
 	public hasRingingCall = false
 	public hasOutgoingCall = false
 	public microphoneMute = false
+	public osdMode = ''
+	public mainVideoSource = ''
+	public volumeLevel: number | undefined
+	public videoInputConnectorNames: Record<string, string> = {}
 	public autoAnswerConfig: RoomOSConfigAutoAnswer = {
 		Delay: '',
 		Mode: RoomOSOnOffBoolean.Unknown,

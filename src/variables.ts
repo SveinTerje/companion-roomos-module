@@ -1,6 +1,6 @@
 import { CompanionVariableDefinition } from '@companion-module/base'
 import { RoomOSInstanceBase } from './roomos.js'
-import { standardVariableDefinitions } from './standard-status.js'
+import { standardInitialValues, standardVariableDefinitions } from './standard-status.js'
 
 export function GetSessionVariableDefinitions(): Record<string, CompanionVariableDefinition> {
 	return {
@@ -31,11 +31,6 @@ export function InitVariables(instance: RoomOSInstanceBase): void {
 		event_last_json: '',
 		event_last_time: '',
 		event_last_count: '0',
-		SystemUnit_Software_Version: '',
-		number_of_active_calls: '',
-		microphones_mute: '',
-		audio_connector_mute: '',
-		systemtime: '',
-		Presentation: '',
+		...standardInitialValues(),
 	})
 }

@@ -1,4 +1,4 @@
-export type XapiKind = 'status' | 'event'
+export type XapiKind = 'status' | 'event' | 'config'
 
 const KIND_PREFIX = /^(?:x)?(Status|Event|Configuration)(?=$|[\/.\s])/i
 
@@ -41,4 +41,42 @@ export function jsonXapiValue(value: unknown): string {
 
 export function subscriptionKey(kind: XapiKind, path: string): string {
 	return `${kind}:${path}`
+}
+
+/**
+ * Extract Connector[i].Name entries from an xConfiguration Video Input Connector
+ * payload. jsxapi may deliver an array of `{ id, Name }` objects or a map keyed
+ * by connector index.
+ */
+export function parseVideoInputConnectorNames(value: unknown): Record<string, string> {
+	const names: Record<string, string> = {}
+	if (value == null || typeof value !== 'object') return names
+
+	const take = (id: unknown, rec: Record<string, unknown>): void => {
+		if (id == null || id === '') return
+		if (rec.Name == null || rec.Name === '') return
+		names[String(id)] = String(rec.Name)
+	}
+
+	if (Array.isArray(value)) {
+		for (const item of value) {
+			if (!item || typeof item !== 'object') continue
+			const rec = item as Record<string, unknown>
+			take(rec.id ?? rec.ConnectorId, rec)
+		}
+		return names
+	}
+
+	for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+		if (!item || typeof item !== 'object') continue
+		const rec = item as Record<string, unknown>
+		take(rec.id ?? rec.ConnectorId ?? key, rec)
+	}
+	return names
+}
+
+export function lookupMainVideoSourceName(id: string, names: Record<string, string>): string {
+	if (!id) return ''
+	if (id === 'Composed') return 'Composed'
+	return names[id] || names[String(Number(id))] || id
 }

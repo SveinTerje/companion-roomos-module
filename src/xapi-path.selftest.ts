@@ -1,5 +1,15 @@
-import { normalizeXapiPath, pathToVariableId } from './xapi-path.js'
-import { findStandardStatus, statusVariableId } from './standard-status.js'
+import {
+	lookupMainVideoSourceName,
+	normalizeXapiPath,
+	parseVideoInputConnectorNames,
+	pathToVariableId,
+} from './xapi-path.js'
+import {
+	describeSubscriptionMapping,
+	findStandardConfig,
+	findStandardStatus,
+	statusVariableId,
+} from './standard-status.js'
 import { formatXapiError, isTransportFailure, subscribeParamsWithCurrentValue } from './xapi-rpc.js'
 
 const normalizeCases: Array<[string, string]> = [
@@ -83,7 +93,59 @@ if (customId.variableId !== 'status_Standby_State') {
 	failed++
 }
 
+if (normalizeXapiPath('xConfiguration UserInterface OSD Mode') !== 'UserInterface/OSD/Mode') {
+	console.error('OSD Mode path should normalize from xConfiguration form')
+	failed++
+}
+if (!findStandardStatus('Audio Volume') || findStandardStatus('Audio Volume')?.variableId !== 'volume') {
+	console.error('Audio Volume should map to volume')
+	failed++
+}
+if (!findStandardStatus('Video Input MainVideoSource')) {
+	console.error('Video Input MainVideoSource should be a standard status')
+	failed++
+}
+if (!findStandardConfig('UserInterface OSD Mode')) {
+	console.error('UserInterface OSD Mode should be a standard config')
+	failed++
+}
+
+const mapped = describeSubscriptionMapping('status', 'Video/Input/MainVideoSource', 'MainVideoSource')
+if (!mapped.includes('main_video_source_name') || !mapped.includes('Connector')) {
+	console.error(`MainVideoSource mapping description => ${mapped}`)
+	failed++
+}
+
+const names = parseVideoInputConnectorNames({
+	1: { Name: 'Camera 1' },
+	2: { Name: 'PC' },
+})
+if (names['1'] !== 'Camera 1' || names['2'] !== 'PC') {
+	console.error(`parseVideoInputConnectorNames map => ${JSON.stringify(names)}`)
+	failed++
+}
+const namesArr = parseVideoInputConnectorNames([
+	{ id: 3, Name: 'HDMI' },
+	{ ConnectorId: 4, Name: 'USB-C' },
+])
+if (namesArr['3'] !== 'HDMI' || namesArr['4'] !== 'USB-C') {
+	console.error(`parseVideoInputConnectorNames array => ${JSON.stringify(namesArr)}`)
+	failed++
+}
+if (lookupMainVideoSourceName('2', names) !== 'PC') {
+	console.error('lookupMainVideoSourceName should use Connector Name')
+	failed++
+}
+if (lookupMainVideoSourceName('Composed', names) !== 'Composed') {
+	console.error('Composed main source should stay Composed')
+	failed++
+}
+if (lookupMainVideoSourceName('9', names) !== '9') {
+	console.error('unknown connector id should fall back to the id')
+	failed++
+}
+
 if (failed) {
 	process.exit(1)
 }
-console.log(`xapi-path selftest: ${normalizeCases.length + 2 + 8} checks ok`)
+console.log(`xapi-path selftest: ${normalizeCases.length + 2 + 8 + 11} checks ok`)
